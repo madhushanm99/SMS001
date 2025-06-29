@@ -7,6 +7,7 @@ use App\Http\Controllers\PO_Controller;
 use App\Http\Controllers\PurchaseReturnController;
 use App\Http\Controllers\GRNController;
 use App\Http\Controllers\StockController;
+use App\Http\Controllers\SalesInvoiceController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\JobTypeController;
@@ -213,8 +214,32 @@ Route::middleware([
 
 
         //SALes Tab
+        Route::prefix('sales-invoices')->name('sales_invoices.')->group(function () {
+            Route::get('/', [SalesInvoiceController::class, 'index'])->name('index');
+            Route::get('/create', [SalesInvoiceController::class, 'create'])->name('create');
+            
+            // AJAX routes - These MUST come before wildcard routes
+            Route::get('/search/customers', [SalesInvoiceController::class, 'searchCustomers'])->name('search_customers');
+            Route::get('/search/items', [SalesInvoiceController::class, 'searchItems'])->name('search_items');
+            Route::post('/temp/add', [SalesInvoiceController::class, 'addTempItem'])->name('add_temp_item');
+            Route::post('/temp/remove', [SalesInvoiceController::class, 'removeTempItem'])->name('remove_temp_item');
+            Route::get('/session-items', [SalesInvoiceController::class, 'getSessionItems'])->name('get_session_items');
+            Route::post('/hold', [SalesInvoiceController::class, 'hold'])->name('hold');
+            Route::post('/finalize', [SalesInvoiceController::class, 'finalize'])->name('finalize');
+            
+            // Wildcard routes - These MUST come after specific routes
+            Route::get('/{id}', [SalesInvoiceController::class, 'show'])->name('show');
+            Route::get('/{id}/edit', [SalesInvoiceController::class, 'edit'])->name('edit');
+            Route::put('/{id}', [SalesInvoiceController::class, 'update'])->name('update');
+            Route::delete('/{id}', [SalesInvoiceController::class, 'destroy'])->name('destroy');
+            Route::get('/{id}/pdf', [SalesInvoiceController::class, 'pdf'])->name('pdf');
+            Route::post('/{id}/email', [SalesInvoiceController::class, 'emailInvoice'])->name('email');
+            Route::get('/{id}/finalize', [SalesInvoiceController::class, 'finalizeHold'])->name('finalize_hold');
+        });
+        
+        // Keep old route for compatibility
         Route::get('/saleInvoice', function () {
-            return view('Sales/saleInvoice');
+            return redirect()->route('sales_invoices.index');
         })->name('saleInvoice');
         // Route::get('/quotation', action: function () {
         //     return view(view: 'Sales/Quotation');
@@ -271,10 +296,7 @@ Route::middleware([
 
     // Routes for users
     Route::middleware('user.type:user')->group(function () {
-        Route::get('/saleInvoice', function () {
-            return view('Sales/saleInvoice');
-        })->name('saleInvoice');
-
+        // Sales invoices are available to users as well
     });
 
     // Routes for managers
