@@ -211,13 +211,121 @@ class QuotationController extends Controller
     public function edit(Quotation $quotation)
     {
         $quotation->load('items');
+        
+        // Store current items in session for editing
+        $editItems = [];
+        foreach ($quotation->items as $item) {
+            $editItems[] = [
+                'type' => $item->item_type,
+                'item_id' => $item->item_id,
+                'description' => $item->description,
+                'qty' => $item->qty,
+                'price' => $item->price,
+                'line_total' => $item->line_total
+            ];
+        }
+        session(['edit_quotation_items' => $editItems]);
+        
         return view('quotations.edit', compact('quotation'));
     }
 
     public function update(Request $request, Quotation $quotation)
     {
+        $request->validate([
+            'customer_custom_id' => 'required|string',
+            'vehicle_no' => 'nullable|string'
+        ]);
 
-        return redirect()->route('quotations.index')->with('success', 'Quotation updated.');
+        $items = session()->get('edit_quotation_items', []);
+        if (empty($items)) {
+            return response()->json(['success' => false, 'message' => 'Add at least one item']);
+        }
+
+        DB::beginTransaction();
+        try {
+            // Update quotation details
+            $quotation->update([
+                'customer_custom_id' => $request->customer_custom_id,
+                'vehicle_no' => $request->vehicle_no,
+                'grand_total' => collect($items)->sum('line_total'),
+            ]);
+
+            // Delete existing items
+            $quotation->items()->delete();
+
+            // Add updated items
+            foreach ($items as $i => $item) {
+                QuotationItem::create([
+                    'quotation_id' => $quotation->id,
+                    'line_no' => $i + 1,
+                    'item_type' => $item['type'],
+                    'item_id' => $item['item_id'],
+                    'description' => $item['description'],
+                    'qty' => $item['qty'],
+                    'price' => $item['price'],
+                    'line_total' => $item['line_total'],
+                    'status' => true,
+                ]);
+            }
+
+            DB::commit();
+            session()->forget('edit_quotation_items');
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Quotation updated successfully',
+                'redirect_url' => route('quotations.index')
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => 'Failed to update: ' . $e->getMessage()]);
+        }
+    }
+
+    // Add methods for edit session management
+    public function addEditTempItem(Request $request)
+    {
+        $request->validate([
+            'type' => 'required|in:spare,job',
+            'item_id' => 'required|string',
+            'description' => 'required|string',
+            'qty' => 'required|integer|min:1',
+            'price' => 'required|numeric|min:0'
+        ]);
+
+        $item = [
+            'type' => $request->type,
+            'item_id' => $request->item_id,
+            'description' => $request->description,
+            'qty' => $request->qty,
+            'price' => $request->price,
+            'line_total' => $request->qty * $request->price
+        ];
+
+        $items = session()->get('edit_quotation_items', []);
+        $items[] = $item;
+        session(['edit_quotation_items' => $items]);
+
+        return response()->json(['success' => true, 'items' => $items]);
+    }
+
+    public function removeEditTempItem(Request $request)
+    {
+        $request->validate(['index' => 'required|integer']);
+
+        $items = session()->get('edit_quotation_items', []);
+        if (isset($items[$request->index])) {
+            array_splice($items, $request->index, 1);
+            session(['edit_quotation_items' => $items]);
+        }
+
+        return response()->json(['success' => true, 'items' => $items]);
+    }
+
+    public function getEditSessionItems()
+    {
+        $items = session()->get('edit_quotation_items', []);
+        return response()->json(['success' => true, 'items' => $items]);
     }
 
     public function removeItem(Quotation $quotation, QuotationItem $item)

@@ -168,13 +168,16 @@ Route::middleware([
 
             Route::post('/temp/add', [QuotationController::class, 'addTempItem'])->name('add_temp_item');
             Route::post('/temp/remove', [QuotationController::class, 'removeTempItem'])->name('remove_temp_item');
+            Route::post('/edit-temp/add', [QuotationController::class, 'addEditTempItem'])->name('add_edit_temp_item');
+            Route::post('/edit-temp/remove', [QuotationController::class, 'removeEditTempItem'])->name('remove_edit_temp_item');
+            Route::get('/edit-temp/items', [QuotationController::class, 'getEditSessionItems'])->name('get_edit_session_items');
             Route::delete('{quotation}/items/{item}', [QuotationController::class, 'removeItem'])->name('remove_item');
 
             Route::get('/customer-search', [QuotationController::class, 'searchCustomers'])->name('customer_search');
             Route::get('/vehicle-search', [QuotationController::class, 'searchVehicles'])->name('vehicle_search');
             Route::get('/item-search', [QuotationController::class, 'searchItems'])->name('item_search');
             Route::get('/job-search', [QuotationController::class, 'searchJobs'])->name('job_search');
-            Route::get('/quotations/{quotation}/pdf', [QuotationController::class, 'pdf'])->name('pdf');
+            Route::get('/{quotation}/pdf', [QuotationController::class, 'pdf'])->name('pdf');
             //Route::get('/{quotation}', [QuotationController::class, 'destroy'])->name('destroy');
         });
 
