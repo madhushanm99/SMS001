@@ -14,7 +14,8 @@ class QuotationController extends Controller
     {
         $query = DB::table('quotations')
             ->leftJoin('customers', 'quotations.customer_custom_id', '=', 'customers.custom_id')
-            ->select('quotations.*', 'customers.name as customer_name', 'customers.phone', 'customers.nic');
+            ->select('quotations.*', 'customers.name as customer_name', 'customers.phone', 'customers.nic')
+            ->whereNull('quotations.deleted_at'); // Exclude soft deleted records
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('quotations.quotation_no', 'like', "%$search%")
@@ -339,12 +340,23 @@ class QuotationController extends Controller
         return back()->with('success', 'Item removed.');
     }
 
-    public function destroy(Quotation $quotation_id)
+    public function destroy(Quotation $quotation)
     {
-
-        $quotation_id->update(['status' => false]);
-
-        return back()->with('success', 'Job Type marked as inactive.' . $quotation_id);
+        try {
+            DB::beginTransaction();
+            
+            // Soft delete all related quotation items first
+            $quotation->items()->delete();
+            
+            // Then soft delete the quotation itself
+            $quotation->delete();
+            
+            DB::commit();
+            return back()->with('success', 'Quotation deleted successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Failed to delete quotation: ' . $e->getMessage());
+        }
     }
 
 

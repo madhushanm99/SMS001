@@ -21,9 +21,14 @@
                 <td> <span class="badge {{ $q->status ? 'badge-success' : 'badge-secondary' }}">
                         {{ $q->status ? 'Active' : 'Inactive' }} </span> </td>
                 <td> <a href="{{ route('quotations.pdf', $q->id) }}" target="_blank" class="btn btn-sm btn-info">View</a> </td>
-                <td> <a href="{{ route('quotations.edit', $q->id) }}" class="btn btn-sm btn-warning">Edit</a>
-                    <a href="" class="btn btn-sm btn-danger"
-                        onclick="return confirm('Mark as deleted?')">Delete</a>
+                <td> 
+                    <a href="{{ route('quotations.edit', $q->id) }}" class="btn btn-sm btn-warning">Edit</a>
+                    <form method="POST" action="{{ route('quotations.destroy', $q->id) }}" style="display: inline-block;" 
+                          onsubmit="return confirm('Are you sure you want to delete this quotation?')">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                    </form>
                 </td>
         </tr> @empty <tr>
                 <td colspan="7" class="text-center">No quotations found.</td>

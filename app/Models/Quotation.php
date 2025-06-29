@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Quotation extends Model
 {
+    use SoftDeletes;
+    
     protected $fillable = [
         'quotation_no',
         'customer_custom_id',
@@ -17,6 +20,8 @@ class Quotation extends Model
         'status'
     ];
 
+    protected $dates = ['deleted_at'];
+
     public static function generateQuotationNo(): string
     {
         $last = self::latest('id')->first();
@@ -27,5 +32,10 @@ class Quotation extends Model
     public function items()
     {
         return $this->hasMany(QuotationItem::class);
+    }
+
+    public function itemsWithTrashed()
+    {
+        return $this->hasMany(QuotationItem::class)->withTrashed();
     }
 }

@@ -178,7 +178,7 @@ Route::middleware([
             Route::get('/item-search', [QuotationController::class, 'searchItems'])->name('item_search');
             Route::get('/job-search', [QuotationController::class, 'searchJobs'])->name('job_search');
             Route::get('/{quotation}/pdf', [QuotationController::class, 'pdf'])->name('pdf');
-            //Route::get('/{quotation}', [QuotationController::class, 'destroy'])->name('destroy');
+            Route::delete('/{quotation}', [QuotationController::class, 'destroy'])->name('destroy');
         });
 
 
