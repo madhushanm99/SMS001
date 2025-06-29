@@ -31,6 +31,11 @@ class SalesInvoice extends Model
         return $this->hasMany(SalesInvoiceItem::class, 'sales_invoice_id');
     }
 
+    public function returns()
+    {
+        return $this->hasMany(InvoiceReturn::class, 'sales_invoice_id');
+    }
+
     public static function generateInvoiceNo(): string
     {
         $lastInvoice = self::latest('invoice_no')->first();

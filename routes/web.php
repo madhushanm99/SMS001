@@ -244,8 +244,23 @@ Route::middleware([
         // Route::get('/quotation', action: function () {
         //     return view(view: 'Sales/Quotation');
         // })->name('quotation');
+        // Invoice Returns - Admin/Manager only
+        Route::middleware('user.type:admin,manager')->prefix('invoice-returns')->name('invoice_returns.')->group(function () {
+            Route::get('/', [App\Http\Controllers\InvoiceReturnController::class, 'index'])->name('index');
+            Route::get('/select-invoice', [App\Http\Controllers\InvoiceReturnController::class, 'selectInvoice'])->name('select');
+            Route::get('/search/invoices', [App\Http\Controllers\InvoiceReturnController::class, 'searchInvoices'])->name('search_invoices');
+            Route::get('/create/{invoice}', [App\Http\Controllers\InvoiceReturnController::class, 'createReturn'])->name('create');
+            Route::post('/add-item', [App\Http\Controllers\InvoiceReturnController::class, 'addReturnItem'])->name('add_item');
+            Route::post('/remove-item', [App\Http\Controllers\InvoiceReturnController::class, 'removeReturnItem'])->name('remove_item');
+            Route::get('/session-items', [App\Http\Controllers\InvoiceReturnController::class, 'getSessionItems'])->name('session_items');
+            Route::post('/', [App\Http\Controllers\InvoiceReturnController::class, 'store'])->name('store');
+            Route::get('/{return}', [App\Http\Controllers\InvoiceReturnController::class, 'show'])->name('show');
+            Route::get('/{return}/pdf', [App\Http\Controllers\InvoiceReturnController::class, 'pdf'])->name('pdf');
+        });
+        
+        // Keep old route for compatibility
         Route::get('/INVReturn', function () {
-            return view(view: 'Sales/INVReturn');
+            return redirect()->route('invoice_returns.index');
         })->name('INVReturn');
         Route::get('/workOrder', function () {
             return view('Sales/workOrder');
