@@ -122,6 +122,54 @@
           </li><!-- End Tables Nav -->
 
           <li class="nav-item">
+              <a class="nav-link collapsed" data-bs-target="#payments-nav" data-bs-toggle="collapse" href="#">
+                  <i class="bi bi-credit-card-2-front"></i><span>PAYMENTS</span><i class="bi bi-chevron-down ms-auto"></i>
+              </a>
+              <ul id="payments-nav" class="nav-content collapse " data-bs-parent="#sidebar-nav">
+                  <li>
+                      <a href="{{ route('payment-transactions.dashboard') }}">
+                          <i class="bi bi-speedometer2"></i><span>Payment Dashboard</span>
+                      </a>
+                  </li>
+                  <li>
+                      <a href="{{ route('payment-transactions.index') }}">
+                          <i class="bi bi-journal-text"></i><span>Payment Transactions</span>
+                      </a>
+                  </li>
+                  <li>
+                      <a href="{{ route('payment-transactions.quick-cash-in') }}">
+                          <i class="bi bi-cash-coin"></i><span>Quick Cash In</span>
+                      </a>
+                  </li>
+                  <li>
+                      <a href="{{ route('payment-transactions.quick-cash-out') }}">
+                          <i class="bi bi-cash-stack"></i><span>Quick Cash Out</span>
+                      </a>
+                  </li>
+                  <li>
+                      <a href="{{ route('payment-methods.index') }}">
+                          <i class="bi bi-credit-card"></i><span>Payment Methods</span>
+                      </a>
+                  </li>
+                  <li>
+                      <a href="{{ route('bank-accounts.index') }}">
+                          <i class="bi bi-bank"></i><span>Bank Accounts</span>
+                      </a>
+                  </li>
+                  <li>
+                      <a href="{{ route('payment-categories.index') }}">
+                          <i class="bi bi-tags"></i><span>Payment Categories</span>
+                      </a>
+                  </li>
+                  <li>
+                      <a href="{{ route('payment-reports.index') }}">
+                          <i class="bi bi-file-earmark-bar-graph"></i><span>Payment Reports</span>
+                      </a>
+                  </li>
+              </ul>
+          </li><!-- End Payments Nav -->
+
+          <li class="nav-item">
               <a class="nav-link collapsed" data-bs-target="#charts-nav" data-bs-toggle="collapse" href="#">
                   <i class="bi bi-pie-chart-fill"></i><span>STATISITICS</span><i class="bi bi-chevron-down ms-auto"></i>
               </a>

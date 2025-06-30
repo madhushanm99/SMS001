@@ -144,6 +144,22 @@ class GRNController extends Controller
             session()->forget($this->sessionKey());
 
             DB::commit();
+            
+            // Calculate total for payment prompt
+            $totalAmount = collect($items)->sum('line_total');
+            
+            // Get supplier information for payment prompt
+            $supplier = \App\Models\Supplier::where('Supp_CustomID', $request->supp_Cus_ID)->first();
+            
+            session()->flash('grn_created', [
+                'grn_id' => $grnId,
+                'grn_no' => $grnNo,
+                'supplier_id' => $request->supp_Cus_ID,
+                'supplier_name' => $supplier->Supp_Name ?? 'Unknown Supplier',
+                'total_amount' => $totalAmount,
+                'prompt_payment' => true
+            ]);
+            
             return redirect()->route('grns.index')->with('success', 'GRN created successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
@@ -277,5 +293,90 @@ class GRNController extends Controller
         $supplier = DB::table('suppliers')->where('Supp_CustomID', $grn->supp_Cus_ID)->first();
         $pdf = Pdf::loadView('grns.pdf', compact('grn', 'items', 'supplier'));
         return $pdf->stream("GRN-{$grn->grn_no}.pdf");
+    }
+
+    public function createPayment(Request $request)
+    {
+        $request->validate([
+            'grn_id' => 'required|exists:grn,grn_id',
+            'amount' => 'required|numeric|min:0.01',
+            'payment_method_id' => 'required|exists:payment_methods,id',
+            'bank_account_id' => 'nullable|exists:bank_accounts,id',
+            'payment_category_id' => 'required|exists:payment_categories,id',
+            'description' => 'nullable|string|max:255',
+            'reference_no' => 'nullable|string|max:100',
+        ]);
+
+        try {
+            $grn = \App\Models\GRN::findOrFail($request->grn_id);
+            $supplier = \App\Models\Supplier::where('Supp_CustomID', $grn->supp_Cus_ID)->first();
+            
+            // Calculate GRN total
+            $grnItems = \App\Models\GRNItem::where('grn_id', $grn->grn_id)->get();
+            $grnTotal = $grnItems->sum('line_total');
+            
+            // Check existing payments
+            $existingPayments = \App\Models\PaymentTransaction::where('po_auto_id', $grn->po_Auto_ID)
+                ->where('type', 'cash_out')
+                ->where('status', 'completed')
+                ->sum('amount');
+            
+            $outstandingAmount = $grnTotal - $existingPayments;
+
+            if ($request->amount > $outstandingAmount) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Payment amount ({$request->amount}) cannot exceed outstanding amount ({$outstandingAmount})"
+                ]);
+            }
+
+            DB::beginTransaction();
+
+            $transaction = \App\Models\PaymentTransaction::create([
+                'transaction_no' => \App\Models\PaymentTransaction::generateTransactionNumber(),
+                'type' => 'cash_out',
+                'amount' => $request->amount,
+                'transaction_date' => now(),
+                'description' => $request->description ?: "Payment for GRN {$grn->grn_no}",
+                'payment_method_id' => $request->payment_method_id,
+                'bank_account_id' => $request->bank_account_id,
+                'payment_category_id' => $request->payment_category_id,
+                'supplier_custom_id' => $grn->supp_Cus_ID,
+                'po_auto_id' => $grn->po_Auto_ID,
+                'reference_no' => $request->reference_no,
+                'status' => 'completed',
+                'created_by' => auth()->user()->name ?? 'System',
+                'approved_by' => auth()->user()->name ?? 'System',
+                'approved_at' => now(),
+            ]);
+
+            // Update bank account balance if specified
+            if ($request->bank_account_id) {
+                $bankAccount = \App\Models\BankAccount::find($request->bank_account_id);
+                if ($bankAccount) {
+                    $bankAccount->decrement('current_balance', $request->amount);
+                }
+            }
+
+            DB::commit();
+
+            $remainingBalance = $outstandingAmount - $request->amount;
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Payment recorded successfully!',
+                'payment_id' => $transaction->id,
+                'transaction_no' => $transaction->transaction_no,
+                'remaining_balance' => $remainingBalance,
+                'is_fully_paid' => $remainingBalance <= 0
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Error recording payment: ' . $e->getMessage()
+            ]);
+        }
     }
 }

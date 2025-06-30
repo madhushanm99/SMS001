@@ -140,6 +140,70 @@
         </tfoot>
     </table>
 
+    {{-- Payment Status Section --}}
+    @php
+        $totalPaid = $invoice->paymentTransactions()
+            ->where('status', 'completed')
+            ->where('type', 'cash_in')
+            ->sum('amount');
+        $outstandingAmount = $invoice->grand_total - $totalPaid;
+        $paymentStatus = $totalPaid >= $invoice->grand_total ? 'Paid' : ($totalPaid > 0 ? 'Partially Paid' : 'Unpaid');
+    @endphp
+
+    <div style="margin: 30px 0; border: 1px solid #ddd; padding: 15px; background-color: #f8f9fa;">
+        <div style="display: table; width: 100%;">
+            <div style="display: table-cell; width: 50%; vertical-align: top;">
+                <strong>Payment Status:</strong><br>
+                <span style="font-size: 14px; font-weight: bold; 
+                    color: {{ $paymentStatus === 'Paid' ? '#28a745' : ($paymentStatus === 'Partially Paid' ? '#ffc107' : '#dc3545') }};">
+                    {{ $paymentStatus }}
+                </span>
+            </div>
+            <div style="display: table-cell; width: 50%; text-align: right; vertical-align: top;">
+                <strong>Amount Paid:</strong> Rs. {{ number_format($totalPaid, 2) }}<br>
+                @if($outstandingAmount > 0)
+                    <strong style="color: #dc3545;">Outstanding Balance:</strong> 
+                    <span style="color: #dc3545; font-weight: bold;">Rs. {{ number_format($outstandingAmount, 2) }}</span>
+                @endif
+            </div>
+        </div>
+    </div>
+
+    {{-- Payment Details --}}
+    @if($totalPaid > 0)
+        <div style="margin-bottom: 30px;">
+            <h4 style="margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Payment History</h4>
+            <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                <thead>
+                    <tr style="background-color: #f8f9fa;">
+                        <th style="border: 1px solid #ddd; padding: 6px; text-align: left;">Date</th>
+                        <th style="border: 1px solid #ddd; padding: 6px; text-align: left;">Method</th>
+                        <th style="border: 1px solid #ddd; padding: 6px; text-align: left;">Reference</th>
+                        <th style="border: 1px solid #ddd; padding: 6px; text-align: right;">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($invoice->paymentTransactions()->where('status', 'completed')->where('type', 'cash_in')->get() as $payment)
+                        <tr>
+                            <td style="border: 1px solid #ddd; padding: 6px;">
+                                {{ $payment->transaction_date->format('M d, Y') }}
+                            </td>
+                            <td style="border: 1px solid #ddd; padding: 6px;">
+                                {{ $payment->paymentMethod->name ?? 'N/A' }}
+                            </td>
+                            <td style="border: 1px solid #ddd; padding: 6px;">
+                                {{ $payment->reference_no ?? '-' }}
+                            </td>
+                            <td style="border: 1px solid #ddd; padding: 6px; text-align: right;">
+                                Rs. {{ number_format($payment->amount, 2) }}
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    @endif
+
     <div class="footer">
         <p>Thank you for your business!</p>
         <p>This is a computer generated invoice.</p>

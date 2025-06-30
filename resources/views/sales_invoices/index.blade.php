@@ -38,6 +38,15 @@
                                     </select>
                                 </div>
                                 <div class="col-md-2">
+                                    <label for="payment_status" class="form-label">Payment Status</label>
+                                    <select class="form-select" id="payment_status" name="payment_status">
+                                        <option value="">All Payments</option>
+                                        <option value="paid" {{ request('payment_status') == 'paid' ? 'selected' : '' }}>Paid</option>
+                                        <option value="partially_paid" {{ request('payment_status') == 'partially_paid' ? 'selected' : '' }}>Partially Paid</option>
+                                        <option value="unpaid" {{ request('payment_status') == 'unpaid' ? 'selected' : '' }}>Unpaid</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
                                     <label for="from_date" class="form-label">From Date</label>
                                     <input type="date" class="form-control" id="from_date" name="from_date" 
                                            value="{{ request('from_date') }}">
@@ -47,19 +56,90 @@
                                     <input type="date" class="form-control" id="to_date" name="to_date" 
                                            value="{{ request('to_date') }}">
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-1">
                                     <label class="form-label">&nbsp;</label>
                                     <div class="d-flex gap-2">
                                         <button type="submit" class="btn btn-outline-primary">
-                                            <i class="bi bi-search"></i> Search
+                                            <i class="bi bi-search"></i>
                                         </button>
                                         <a href="{{ route('sales_invoices.index') }}" class="btn btn-outline-secondary">
-                                            <i class="bi bi-arrow-clockwise"></i> Reset
+                                            <i class="bi bi-arrow-clockwise"></i>
                                         </a>
                                     </div>
                                 </div>
                             </div>
                         </form>
+
+                        <!-- Payment Summary Cards -->
+                        @php
+                            $allInvoices = \App\Models\SalesInvoice::where('status', 'finalized')->with('paymentTransactions')->get();
+                            $totalInvoices = $allInvoices->count();
+                            $totalAmount = $allInvoices->sum('grand_total');
+                            $totalPaid = $allInvoices->sum(function($invoice) {
+                                return $invoice->paymentTransactions()
+                                    ->where('status', 'completed')
+                                    ->where('type', 'cash_in')
+                                    ->sum('amount');
+                            });
+                            $outstandingTotal = $totalAmount - $totalPaid;
+                            
+                            $paidCount = $allInvoices->filter(function($invoice) {
+                                $paid = $invoice->paymentTransactions()
+                                    ->where('status', 'completed')
+                                    ->where('type', 'cash_in')
+                                    ->sum('amount');
+                                return $paid >= $invoice->grand_total;
+                            })->count();
+                            
+                            $partiallyPaidCount = $allInvoices->filter(function($invoice) {
+                                $paid = $invoice->paymentTransactions()
+                                    ->where('status', 'completed')
+                                    ->where('type', 'cash_in')
+                                    ->sum('amount');
+                                return $paid > 0 && $paid < $invoice->grand_total;
+                            })->count();
+                            
+                            $unpaidCount = $totalInvoices - $paidCount - $partiallyPaidCount;
+                        @endphp
+
+                        <div class="row mb-4">
+                            <div class="col-md-3">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h5 class="card-title text-success">{{ $paidCount }}</h5>
+                                        <p class="card-text text-muted">Fully Paid</p>
+                                        <small class="text-success">{{ $totalInvoices > 0 ? round(($paidCount / $totalInvoices) * 100, 1) : 0 }}%</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h5 class="card-title text-warning">{{ $partiallyPaidCount }}</h5>
+                                        <p class="card-text text-muted">Partially Paid</p>
+                                        <small class="text-warning">{{ $totalInvoices > 0 ? round(($partiallyPaidCount / $totalInvoices) * 100, 1) : 0 }}%</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h5 class="card-title text-danger">{{ $unpaidCount }}</h5>
+                                        <p class="card-text text-muted">Unpaid</p>
+                                        <small class="text-danger">{{ $totalInvoices > 0 ? round(($unpaidCount / $totalInvoices) * 100, 1) : 0 }}%</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h5 class="card-title text-primary">Rs. {{ number_format($outstandingTotal, 0) }}</h5>
+                                        <p class="card-text text-muted">Outstanding</p>
+                                        <small class="text-muted">Total: Rs. {{ number_format($totalAmount, 0) }}</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
                         <!-- Invoices Table -->
                         <div id="invoices-table">
@@ -93,6 +173,9 @@
             </div>
         </div>
     </div>
+
+    <!-- Include Payment Prompt Component -->
+    @include('components.payment-prompt')
 
     @push('scripts')
     <script>
@@ -177,6 +260,209 @@
                 }
             });
         }
+
+        // Handle payment button click with fallback
+        window.handlePaymentClick = function(button, entityId, entityNo, partyName, totalAmount, outstandingAmount, type) {
+            // Debug: Log the values being passed
+            console.log('🔍 handlePaymentClick called with:', {
+                entityId,
+                entityNo,
+                partyName,
+                totalAmount,
+                outstandingAmount,
+                type,
+                'outstandingAmount type': typeof outstandingAmount,
+                'outstandingAmount <= 0': outstandingAmount <= 0
+            });
+            
+            // Debug: Show all data attributes for comparison
+            const btn = $(button);
+            console.log('🔍 Button data attributes:', {
+                'data-invoice-id': btn.data('invoice-id'),
+                'data-invoice-no': btn.data('invoice-no'),
+                'data-customer-name': btn.data('customer-name'),
+                'data-total-amount': btn.data('total-amount'),
+                'data-outstanding-amount': btn.data('outstanding-amount'),
+                'data-payment-status': btn.data('payment-status'),
+                'data-total-paid': btn.data('total-paid'),
+                'outstanding from params': outstandingAmount,
+                'outstanding from data attr': btn.data('outstanding-amount')
+            });
+            
+            // Try the main function first
+            try {
+                window.showPaymentPromptFromIndex(entityId, entityNo, partyName, totalAmount, outstandingAmount, type);
+            } catch (error) {
+                console.error('Error calling payment prompt:', error);
+                // Use data attributes as fallback
+                console.log('🔍 Fallback - using data attributes:', {
+                    'data-outstanding-amount': btn.data('outstanding-amount'),
+                    'data-total-amount': btn.data('total-amount')
+                });
+                window.showPaymentPromptFromIndex(
+                    btn.data('invoice-id'), 
+                    btn.data('invoice-no'), 
+                    btn.data('customer-name'), 
+                    btn.data('total-amount'), 
+                    btn.data('outstanding-amount'), 
+                    'invoice'
+                );
+            }
+        };
+
+        // Payment prompt functionality for index page
+        window.showPaymentPromptFromIndex = function(entityId, entityNo, partyName, totalAmount, outstandingAmount, type) {
+            // Debug: Log the values being passed to payment prompt
+            console.log('🔍 showPaymentPromptFromIndex called with:', {
+                entityId,
+                entityNo,
+                partyName,
+                totalAmount,
+                outstandingAmount,
+                type,
+                'outstandingAmount type': typeof outstandingAmount,
+                'outstandingAmount <= 0': outstandingAmount <= 0
+            });
+            
+            // Set up the payment prompt data
+            const data = {
+                entity_id: entityId,
+                entity_no: entityNo,
+                party_name: partyName,
+                total_amount: parseFloat(totalAmount) || 0,
+                outstanding_amount: parseFloat(outstandingAmount) || 0,
+                type: type
+            };
+            
+            console.log('🔍 Data object being passed to showPaymentPrompt:', data);
+            console.log('🔍 Outstanding amount after parseFloat:', data.outstanding_amount, 'Is <= 0?', data.outstanding_amount <= 0);
+            
+            // Set global variables for the payment prompt
+            window.currentEntityType = type;
+            window.currentEntityId = entityId;
+            
+            // Try to call the function directly first
+            if (typeof window.showPaymentPrompt === 'function' && window.paymentPromptReady) {
+                window.showPaymentPrompt(data);
+                return;
+            }
+            
+            // If not available, wait for it to be defined
+            let attempts = 0;
+            const maxAttempts = 20; // 4 seconds total
+            
+            const checkFunction = setInterval(function() {
+                attempts++;
+                if (typeof window.showPaymentPrompt === 'function' && window.paymentPromptReady) {
+                    clearInterval(checkFunction);
+                    window.showPaymentPrompt(data);
+                } else if (attempts >= maxAttempts) {
+                    clearInterval(checkFunction);
+                    // Show user-friendly error
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Payment System Loading',
+                        text: 'The payment system is still loading. Please try again in a moment.',
+                        showCancelButton: true,
+                        confirmButtonText: 'Try Again',
+                        cancelButtonText: 'Cancel',
+                        confirmButtonColor: '#007bff'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            // Try again
+                            window.showPaymentPromptFromIndex(entityId, entityNo, partyName, totalAmount, outstandingAmount, type);
+                        }
+                    });
+                }
+            }, 200);
+        };
+
+        // Override the payment success callback to refresh the page
+        window.originalHandlePaymentSuccess = window.handlePaymentSuccess;
+        window.handlePaymentSuccess = function(data) {
+            // Show success message
+            Swal.fire({
+                icon: 'success',
+                title: 'Payment Recorded Successfully!',
+                text: `Payment of Rs. ${parseFloat(data.amount).toLocaleString('en-US', {minimumFractionDigits: 2})} has been recorded.`,
+                showConfirmButton: true,
+                confirmButtonText: 'OK'
+            }).then(() => {
+                // Refresh the page to show updated payment information
+                window.location.reload();
+            });
+        };
+
+        // Override skip payment to just close modal and refresh
+        window.originalSkipPayment = window.skipPayment;
+        window.skipPayment = function() {
+            $('#paymentPromptModal').modal('hide');
+            
+            Swal.fire({
+                icon: 'info',
+                title: 'Payment Skipped',
+                text: 'You can record the payment later from this page.',
+                timer: 2000,
+                showConfirmButton: false
+            }).then(() => {
+                // Refresh to show any updated status
+                window.location.reload();
+            });
+        };
+
+        // Initialize tooltips and check payment prompt availability
+        $(document).ready(function() {
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+
+
+        });
+
+        // Test function for debugging (can be removed in production)
+        window.testFullyPaidInvoice = function() {
+            console.log('🧪 Testing fully paid invoice interface...');
+            const testData = {
+                entity_id: '999',
+                entity_no: 'INV000999',
+                party_name: 'Test Customer',
+                total_amount: 1000,
+                outstanding_amount: 0, // Fully paid
+                type: 'invoice'
+            };
+            console.log('🧪 Test data:', testData);
+            window.showPaymentPrompt(testData);
+        };
+        
+        window.testPartiallyPaidInvoice = function() {
+            console.log('🧪 Testing partially paid invoice interface...');
+            const testData = {
+                entity_id: '998',
+                entity_no: 'INV000998',
+                party_name: 'Test Customer',
+                total_amount: 1000,
+                outstanding_amount: 500, // Partially paid
+                type: 'invoice'
+            };
+            console.log('🧪 Test data:', testData);
+            window.showPaymentPrompt(testData);
+        };
+        
+        // Manual override for testing specific invoices
+        window.testInvoiceWithData = function(totalAmount, outstandingAmount) {
+            console.log(`🧪 Testing invoice with total: ${totalAmount}, outstanding: ${outstandingAmount}`);
+            const testData = {
+                entity_id: '999',
+                entity_no: 'INV000999',
+                party_name: 'Test Customer',
+                total_amount: parseFloat(totalAmount),
+                outstanding_amount: parseFloat(outstandingAmount),
+                type: 'invoice'
+            };
+            console.log('🧪 Test data:', testData);
+            window.showPaymentPrompt(testData);
+        };
     </script>
     @endpush
 </x-layout> 

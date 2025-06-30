@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SalesInvoice extends Model
 {
@@ -21,19 +23,75 @@ class SalesInvoice extends Model
         'grand_total' => 'decimal:2',
     ];
 
-    public function customer()
+    // Relationships
+    public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class, 'customer_id', 'custom_id');
     }
 
-    public function items()
+    public function items(): HasMany
     {
         return $this->hasMany(SalesInvoiceItem::class, 'sales_invoice_id');
     }
 
-    public function returns()
+    public function returns(): HasMany
     {
         return $this->hasMany(InvoiceReturn::class, 'sales_invoice_id');
+    }
+
+    public function paymentTransactions(): HasMany
+    {
+        return $this->hasMany(PaymentTransaction::class, 'sales_invoice_id', 'id');
+    }
+
+    // Payment-related methods
+    public function getTotalPayments(): float
+    {
+        return $this->paymentTransactions()
+            ->where('type', 'cash_in')
+            ->where('status', 'completed')
+            ->sum('amount');
+    }
+
+    public function getOutstandingAmount(): float
+    {
+        return $this->grand_total - $this->getTotalPayments();
+    }
+
+    public function isFullyPaid(): bool
+    {
+        return $this->getOutstandingAmount() <= 0;
+    }
+
+    public function isPartiallyPaid(): bool
+    {
+        $totalPayments = $this->getTotalPayments();
+        return $totalPayments > 0 && $totalPayments < $this->grand_total;
+    }
+
+    public function isUnpaid(): bool
+    {
+        return $this->getTotalPayments() == 0;
+    }
+
+    public function getPaymentStatus(): string
+    {
+        if ($this->isFullyPaid()) {
+            return 'Fully Paid';
+        } elseif ($this->isPartiallyPaid()) {
+            return 'Partially Paid';
+        }
+        return 'Unpaid';
+    }
+
+    public function getPaymentStatusColor(): string
+    {
+        if ($this->isFullyPaid()) {
+            return 'success';
+        } elseif ($this->isPartiallyPaid()) {
+            return 'warning';
+        }
+        return 'danger';
     }
 
     public static function generateInvoiceNo(): string

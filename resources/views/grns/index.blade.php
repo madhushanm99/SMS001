@@ -57,6 +57,10 @@
         </table>
         {{ $grns->links() }}
     </div>
+
+    <!-- Include Payment Prompt Modal -->
+    <x-payment-prompt type="grn" payment_type="cash_out" title="Record Supplier Payment" />
+
     @push('scripts')
         <script>
             document.querySelectorAll('.delete-form').forEach(form => {
@@ -64,6 +68,25 @@
                     if (!confirm('Are you sure you want to delete this GRN?')) e.preventDefault();
                 });
             });
+
+            // Check for GRN creation flash data and show payment prompt
+            @if(session('grn_created'))
+                $(document).ready(function() {
+                    const grnData = @json(session('grn_created'));
+                    
+                    if (grnData.prompt_payment) {
+                        // Show payment prompt modal
+                        showPaymentPrompt({
+                            type: 'grn',
+                            entity_id: grnData.grn_id,
+                            entity_no: grnData.grn_no,
+                            party_name: grnData.supplier_name,
+                            total_amount: grnData.total_amount,
+                            outstanding_amount: grnData.total_amount
+                        });
+                    }
+                });
+            @endif
         </script>
     @endpush
 </x-layout>

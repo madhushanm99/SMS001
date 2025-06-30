@@ -45,7 +45,25 @@ class SalesInvoiceController extends Controller
             $query->whereBetween('invoice_date', [$request->from_date, $request->to_date]);
         }
 
-        $invoices = $query->with('customer')
+        // Payment status filter
+        if ($request->filled('payment_status')) {
+            $paymentStatus = $request->payment_status;
+            
+            if ($paymentStatus === 'paid') {
+                $query->whereRaw('(SELECT COALESCE(SUM(amount), 0) FROM payment_transactions WHERE sales_invoice_id = sales_invoices.id AND status = "completed" AND type = "cash_in") >= grand_total');
+            } elseif ($paymentStatus === 'partially_paid') {
+                $query->whereRaw('(SELECT COALESCE(SUM(amount), 0) FROM payment_transactions WHERE sales_invoice_id = sales_invoices.id AND status = "completed" AND type = "cash_in") > 0')
+                      ->whereRaw('(SELECT COALESCE(SUM(amount), 0) FROM payment_transactions WHERE sales_invoice_id = sales_invoices.id AND status = "completed" AND type = "cash_in") < grand_total');
+            } elseif ($paymentStatus === 'unpaid') {
+                $query->whereRaw('(SELECT COALESCE(SUM(amount), 0) FROM payment_transactions WHERE sales_invoice_id = sales_invoices.id AND status = "completed" AND type = "cash_in") = 0');
+            }
+        }
+
+        $invoices = $query->with(['customer', 'paymentTransactions' => function($query) {
+                                $query->where('status', 'completed')
+                                      ->where('type', 'cash_in')
+                                      ->with('paymentMethod');
+                            }])
                          ->orderByDesc('created_at')
                          ->paginate(10);
 
@@ -296,6 +314,9 @@ class SalesInvoiceController extends Controller
                 'status' => 'finalized',
                 'created_by' => auth()->user()->name ?? 'System',
             ]);
+            
+            // Load customer relationship for payment prompt
+            $invoice->load('customer');
 
             foreach ($items as $index => $item) {
                 SalesInvoiceItem::create([
@@ -321,7 +342,16 @@ class SalesInvoiceController extends Controller
                 'message' => 'Invoice finalized successfully',
                 'invoice_id' => $invoice->id,
                 'pdf_url' => route('sales_invoices.pdf', $invoice->id),
-                'redirect_url' => route('sales_invoices.index')
+                'redirect_url' => route('sales_invoices.index'),
+                'prompt_payment' => true,
+                'payment_data' => [
+                    'invoice_id' => $invoice->id,
+                    'invoice_no' => $invoice->invoice_no,
+                    'customer_id' => $invoice->customer_id,
+                    'customer_name' => $invoice->customer->name ?? 'Unknown Customer',
+                    'grand_total' => $invoice->grand_total,
+                    'outstanding_amount' => $invoice->getOutstandingAmount()
+                ]
             ]);
 
         } catch (\Exception $e) {
@@ -655,5 +685,78 @@ class SalesInvoiceController extends Controller
             'items' => $items,
             'total' => $total
         ]);
+    }
+
+    public function createPayment(Request $request)
+    {
+        $request->validate([
+            'invoice_id' => 'required|exists:sales_invoices,id',
+            'amount' => 'required|numeric|min:0.01',
+            'payment_method_id' => 'required|exists:payment_methods,id',
+            'bank_account_id' => 'nullable|exists:bank_accounts,id',
+            'payment_category_id' => 'required|exists:payment_categories,id',
+            'description' => 'nullable|string|max:255',
+            'reference_no' => 'nullable|string|max:100',
+        ]);
+
+        try {
+            $invoice = \App\Models\SalesInvoice::with('customer')->findOrFail($request->invoice_id);
+            $outstandingAmount = $invoice->getOutstandingAmount();
+
+            if ($request->amount > $outstandingAmount) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Payment amount ({$request->amount}) cannot exceed outstanding amount ({$outstandingAmount})"
+                ]);
+            }
+
+            DB::beginTransaction();
+
+            $transaction = \App\Models\PaymentTransaction::create([
+                'transaction_no' => \App\Models\PaymentTransaction::generateTransactionNumber(),
+                'type' => 'cash_in',
+                'amount' => $request->amount,
+                'transaction_date' => now(),
+                'description' => $request->description ?: "Payment for Invoice {$invoice->invoice_no}",
+                'payment_method_id' => $request->payment_method_id,
+                'bank_account_id' => $request->bank_account_id,
+                'payment_category_id' => $request->payment_category_id,
+                'customer_custom_id' => $invoice->customer_id,
+                'sales_invoice_id' => $invoice->id,
+                'reference_no' => $request->reference_no,
+                'status' => 'completed',
+                'created_by' => auth()->user()->name ?? 'System',
+                'approved_by' => auth()->user()->name ?? 'System',
+                'approved_at' => now(),
+            ]);
+
+            // Update bank account balance if specified
+            if ($request->bank_account_id) {
+                $bankAccount = \App\Models\BankAccount::find($request->bank_account_id);
+                if ($bankAccount) {
+                    $bankAccount->increment('current_balance', $request->amount);
+                }
+            }
+
+            DB::commit();
+
+            $remainingBalance = $outstandingAmount - $request->amount;
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Payment recorded successfully!',
+                'payment_id' => $transaction->id,
+                'transaction_no' => $transaction->transaction_no,
+                'remaining_balance' => $remainingBalance,
+                'is_fully_paid' => $remainingBalance <= 0
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Error recording payment: ' . $e->getMessage()
+            ]);
+        }
     }
 } 

@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Po extends Model
 {
@@ -35,18 +37,74 @@ class Po extends Model
     ];
 
     protected $casts = [
-        'order_date' => 'date',
-        'total_amount' => 'decimal:2'
+        'po_date' => 'date',
+        'grand_Total' => 'decimal:2'
     ];
 
-    public function supplier()
+    // Relationships
+    public function supplier(): BelongsTo
     {
-        return $this->belongsTo(Supplier::class);
+        return $this->belongsTo(Supplier::class, 'supp_Cus_ID', 'Supp_CustomID');
     }
 
-    public function items()
+    public function items(): HasMany
     {
-        return $this->hasMany(Po_Item::class);
+        return $this->hasMany(Po_Item::class, 'po_Auto_ID', 'po_Auto_ID');
+    }
+
+    public function paymentTransactions(): HasMany
+    {
+        return $this->hasMany(PaymentTransaction::class, 'po_auto_id', 'po_Auto_ID');
+    }
+
+    // Payment-related methods
+    public function getTotalPayments(): float
+    {
+        return $this->paymentTransactions()
+            ->where('type', 'cash_out')
+            ->where('status', 'completed')
+            ->sum('amount');
+    }
+
+    public function getOutstandingAmount(): float
+    {
+        return $this->grand_Total - $this->getTotalPayments();
+    }
+
+    public function isFullyPaid(): bool
+    {
+        return $this->getOutstandingAmount() <= 0;
+    }
+
+    public function isPartiallyPaid(): bool
+    {
+        $totalPayments = $this->getTotalPayments();
+        return $totalPayments > 0 && $totalPayments < $this->grand_Total;
+    }
+
+    public function isUnpaid(): bool
+    {
+        return $this->getTotalPayments() == 0;
+    }
+
+    public function getPaymentStatus(): string
+    {
+        if ($this->isFullyPaid()) {
+            return 'Fully Paid';
+        } elseif ($this->isPartiallyPaid()) {
+            return 'Partially Paid';
+        }
+        return 'Unpaid';
+    }
+
+    public function getPaymentStatusColor(): string
+    {
+        if ($this->isFullyPaid()) {
+            return 'success';
+        } elseif ($this->isPartiallyPaid()) {
+            return 'warning';
+        }
+        return 'danger';
     }
 
     public function calculateTotal()

@@ -111,6 +111,55 @@
             <p style="margin-bottom: 0;">The invoice contains <strong>{{ $invoice->items->count() }} item(s)</strong> with a grand total of <strong>Rs. {{ number_format($invoice->grand_total, 2) }}</strong>.</p>
         </div>
 
+        {{-- Payment Status Section --}}
+        @php
+            $totalPaid = $invoice->paymentTransactions()
+                ->where('status', 'completed')
+                ->where('type', 'cash_in')
+                ->sum('amount');
+            $outstandingAmount = $invoice->grand_total - $totalPaid;
+            $paymentStatus = $totalPaid >= $invoice->grand_total ? 'Paid' : ($totalPaid > 0 ? 'Partially Paid' : 'Unpaid');
+        @endphp
+
+        <div style="background-color: {{ $paymentStatus === 'Paid' ? '#d4edda' : ($paymentStatus === 'Partially Paid' ? '#fff3cd' : '#f8d7da') }}; 
+                    border: 1px solid {{ $paymentStatus === 'Paid' ? '#c3e6cb' : ($paymentStatus === 'Partially Paid' ? '#ffeaa7' : '#f5c6cb') }}; 
+                    padding: 15px; border-radius: 5px; margin: 15px 0;">
+            <h4 style="margin-top: 0; color: {{ $paymentStatus === 'Paid' ? '#155724' : ($paymentStatus === 'Partially Paid' ? '#856404' : '#721c24') }};">
+                Payment Status: {{ $paymentStatus }}
+            </h4>
+            <ul style="margin-bottom: 0;">
+                <li><strong>Amount Paid:</strong> Rs. {{ number_format($totalPaid, 2) }}</li>
+                @if($outstandingAmount > 0)
+                    <li><strong style="color: #721c24;">Outstanding Balance:</strong> <span style="color: #721c24;">Rs. {{ number_format($outstandingAmount, 2) }}</span></li>
+                @endif
+                @if($totalPaid > 0)
+                    <li><strong>Last Payment:</strong> {{ $invoice->paymentTransactions()->where('status', 'completed')->where('type', 'cash_in')->latest()->first()?->transaction_date?->format('M d, Y') ?? 'N/A' }}</li>
+                @endif
+            </ul>
+        </div>
+
+        {{-- Payment History (if payments exist) --}}
+        @if($totalPaid > 0)
+            <div style="background-color: #e9ecef; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                <h4 style="margin-top: 0; color: #495057;">Payment History</h4>
+                <ul style="margin-bottom: 0;">
+                    @foreach($invoice->paymentTransactions()->where('status', 'completed')->where('type', 'cash_in')->latest()->take(3)->get() as $payment)
+                        <li style="margin-bottom: 8px;">
+                            <strong>{{ $payment->transaction_date->format('M d, Y') }}</strong> - 
+                            {{ $payment->paymentMethod->name ?? 'N/A' }} - 
+                            Rs. {{ number_format($payment->amount, 2) }}
+                            @if($payment->reference_no)
+                                (Ref: {{ $payment->reference_no }})
+                            @endif
+                        </li>
+                    @endforeach
+                    @if($invoice->paymentTransactions()->where('status', 'completed')->where('type', 'cash_in')->count() > 3)
+                        <li style="font-style: italic; color: #6c757d;">... and {{ $invoice->paymentTransactions()->where('status', 'completed')->where('type', 'cash_in')->count() - 3 }} more payment(s)</li>
+                    @endif
+                </ul>
+            </div>
+        @endif
+
         <p>Please find the detailed invoice attached as a PDF document. You can download, print, or save this invoice for your records.</p>
 
         <p>If you have any questions about this invoice, please don't hesitate to contact us.</p>

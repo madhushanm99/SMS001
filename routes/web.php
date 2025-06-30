@@ -12,6 +12,11 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\JobTypeController;
 use App\Http\Controllers\QuotationController;
+use App\Http\Controllers\PaymentTransactionController;
+use App\Http\Controllers\PaymentMethodController;
+use App\Http\Controllers\BankAccountController;
+use App\Http\Controllers\PaymentCategoryController;
+use App\Http\Controllers\PaymentReportController;
 
 
 
@@ -181,6 +186,94 @@ Route::middleware([
             Route::get('/{quotation}/pdf', [QuotationController::class, 'pdf'])->name('pdf');
             Route::delete('/{quotation}', [QuotationController::class, 'destroy'])->name('destroy');
         });
+
+        // ===== PAYMENT TRANSACTION SYSTEM =====
+        
+        // Payment Transactions - Main routes
+        Route::prefix('payment-transactions')->name('payment-transactions.')->group(function () {
+            Route::get('/', [PaymentTransactionController::class, 'index'])->name('index');
+            Route::get('/dashboard', [PaymentTransactionController::class, 'dashboard'])->name('dashboard');
+            Route::get('/create', [PaymentTransactionController::class, 'create'])->name('create');
+            Route::post('/', [PaymentTransactionController::class, 'store'])->name('store');
+            Route::get('/quick-cash-in', [PaymentTransactionController::class, 'quickCashIn'])->name('quick-cash-in');
+            Route::get('/quick-cash-out', [PaymentTransactionController::class, 'quickCashOut'])->name('quick-cash-out');
+            
+            // AJAX search routes
+            Route::get('/search/customers', [PaymentTransactionController::class, 'searchCustomers'])->name('search_customers');
+            Route::get('/search/suppliers', [PaymentTransactionController::class, 'searchSuppliers'])->name('search_suppliers');
+            Route::get('/search/invoices', [PaymentTransactionController::class, 'searchInvoices'])->name('search_invoices');
+            Route::get('/search/purchase-orders', [PaymentTransactionController::class, 'searchPurchaseOrders'])->name('search_purchase_orders');
+            
+            // Individual transaction routes
+            Route::get('/{paymentTransaction}', [PaymentTransactionController::class, 'show'])->name('show');
+            Route::get('/{paymentTransaction}/edit', [PaymentTransactionController::class, 'edit'])->name('edit');
+            Route::put('/{paymentTransaction}', [PaymentTransactionController::class, 'update'])->name('update');
+            Route::delete('/{paymentTransaction}', [PaymentTransactionController::class, 'destroy'])->name('destroy');
+            
+            // Workflow actions
+            Route::post('/{paymentTransaction}/approve', [PaymentTransactionController::class, 'approve'])->name('approve');
+            Route::post('/{paymentTransaction}/complete', [PaymentTransactionController::class, 'complete'])->name('complete');
+            Route::post('/{paymentTransaction}/cancel', [PaymentTransactionController::class, 'cancel'])->name('cancel');
+        });
+
+        // Integrated payment creation routes
+        Route::post('/sales-invoices/{invoice}/create-payment', [SalesInvoiceController::class, 'createPayment'])->name('sales_invoices.create_payment');
+        Route::post('/grns/{grn}/create-payment', [GRNController::class, 'createPayment'])->name('grns.create_payment');
+
+        // Payment Methods
+        Route::prefix('payment-methods')->name('payment-methods.')->group(function () {
+            Route::get('/', [PaymentMethodController::class, 'index'])->name('index');
+            Route::get('/create', [PaymentMethodController::class, 'create'])->name('create');
+            Route::post('/', [PaymentMethodController::class, 'store'])->name('store');
+            Route::get('/{paymentMethod}', [PaymentMethodController::class, 'show'])->name('show');
+            Route::get('/{paymentMethod}/edit', [PaymentMethodController::class, 'edit'])->name('edit');
+            Route::put('/{paymentMethod}', [PaymentMethodController::class, 'update'])->name('update');
+            Route::delete('/{paymentMethod}', [PaymentMethodController::class, 'destroy'])->name('destroy');
+            Route::post('/{paymentMethod}/toggle-status', [PaymentMethodController::class, 'toggleStatus'])->name('toggle_status');
+        });
+
+        // Bank Accounts
+        Route::prefix('bank-accounts')->name('bank-accounts.')->group(function () {
+            Route::get('/', [BankAccountController::class, 'index'])->name('index');
+            Route::get('/create', [BankAccountController::class, 'create'])->name('create');
+            Route::post('/', [BankAccountController::class, 'store'])->name('store');
+            Route::get('/reconcile', [BankAccountController::class, 'reconcileIndex'])->name('reconcile');
+            Route::get('/{bankAccount}', [BankAccountController::class, 'show'])->name('show');
+            Route::get('/{bankAccount}/edit', [BankAccountController::class, 'edit'])->name('edit');
+            Route::put('/{bankAccount}', [BankAccountController::class, 'update'])->name('update');
+            Route::delete('/{bankAccount}', [BankAccountController::class, 'destroy'])->name('destroy');
+            Route::get('/{bankAccount}/statement', [BankAccountController::class, 'statement'])->name('statement');
+            Route::get('/{bankAccount}/reconcile', [BankAccountController::class, 'reconcile'])->name('reconcile');
+            Route::post('/{bankAccount}/reconcile', [BankAccountController::class, 'processReconciliation'])->name('process_reconciliation');
+        });
+
+        // Payment Categories
+        Route::prefix('payment-categories')->name('payment-categories.')->group(function () {
+            Route::get('/', [PaymentCategoryController::class, 'index'])->name('index');
+            Route::get('/create', [PaymentCategoryController::class, 'create'])->name('create');
+            Route::post('/', [PaymentCategoryController::class, 'store'])->name('store');
+            Route::get('/{paymentCategory}', [PaymentCategoryController::class, 'show'])->name('show');
+            Route::get('/{paymentCategory}/edit', [PaymentCategoryController::class, 'edit'])->name('edit');
+            Route::put('/{paymentCategory}', [PaymentCategoryController::class, 'update'])->name('update');
+            Route::delete('/{paymentCategory}', [PaymentCategoryController::class, 'destroy'])->name('destroy');
+            Route::post('/{fromCategory}/merge/{toCategory}', [PaymentCategoryController::class, 'merge'])->name('merge');
+        });
+
+        // Payment Reports
+        Route::prefix('payment-reports')->name('payment-reports.')->group(function () {
+            Route::get('/', [PaymentReportController::class, 'index'])->name('index');
+            Route::get('/cash-flow', [PaymentReportController::class, 'cashFlow'])->name('cash_flow');
+            Route::get('/category-summary', [PaymentReportController::class, 'categorySummary'])->name('category_summary');
+            Route::get('/payment-method-summary', [PaymentReportController::class, 'paymentMethodSummary'])->name('payment_method_summary');
+            Route::get('/bank-account-summary', [PaymentReportController::class, 'bankAccountSummary'])->name('bank_account_summary');
+            Route::get('/customer-payments', [PaymentReportController::class, 'customerPayments'])->name('customer_payments');
+            Route::get('/supplier-payments', [PaymentReportController::class, 'supplierPayments'])->name('supplier_payments');
+            Route::get('/outstanding-transactions', [PaymentReportController::class, 'outstandingTransactions'])->name('outstanding_transactions');
+            Route::get('/monthly-comparison', [PaymentReportController::class, 'monthlyComparison'])->name('monthly_comparison');
+            Route::get('/export', [PaymentReportController::class, 'export'])->name('export');
+        });
+
+        // ===== END PAYMENT TRANSACTION SYSTEM =====
 
 
         // Route::resource('customers', CustomerController::class);

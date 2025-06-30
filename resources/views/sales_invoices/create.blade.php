@@ -131,6 +131,9 @@
         </div>
     </section>
 
+    <!-- Include Payment Prompt Modal -->
+    <x-payment-prompt type="invoice" payment_type="cash_in" title="Record Customer Payment" />
+
     @push('scripts')
     <script>
         let selectedItem = null;
@@ -324,8 +327,44 @@
                 },
                 success: function(response) {
                     if (response.success) {
-                        if (action === 'finalize') {
-                            // Ask user what they want to do next
+                        if (action === 'finalize' && response.prompt_payment) {
+                            // Show payment prompt modal
+                            if (typeof window.showPaymentPrompt === 'function') {
+                                window.showPaymentPrompt({
+                                    type: 'invoice',
+                                    entity_id: response.payment_data.invoice_id,
+                                    entity_no: response.payment_data.invoice_no,
+                                    party_name: response.payment_data.customer_name,
+                                    total_amount: response.payment_data.grand_total,
+                                    outstanding_amount: response.payment_data.outstanding_amount
+                                });
+                            } else {
+                                // Fallback if payment prompt is not available
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'Invoice Created Successfully!',
+                                    text: 'What would you like to do next?',
+                                    showDenyButton: true,
+                                    showCancelButton: true,
+                                    confirmButtonText: 'View PDF',
+                                    denyButtonText: 'Email Invoice',
+                                    cancelButtonText: 'Go to Invoice List',
+                                    confirmButtonColor: '#3085d6',
+                                    denyButtonColor: '#28a745',
+                                    cancelButtonColor: '#6c757d'
+                                }).then((result) => {
+                                    if (result.isConfirmed) {
+                                        window.open(response.pdf_url, '_blank');
+                                        window.location.href = response.redirect_url;
+                                    } else if (result.isDenied) {
+                                        emailInvoice(response.invoice_id);
+                                    } else {
+                                        window.location.href = response.redirect_url;
+                                    }
+                                });
+                            }
+                        } else if (action === 'finalize') {
+                            // Fallback if payment prompt is not enabled
                             Swal.fire({
                                 icon: 'success',
                                 title: 'Invoice Created Successfully!',
@@ -343,7 +382,6 @@
                                     window.open(response.pdf_url, '_blank');
                                     window.location.href = response.redirect_url;
                                 } else if (result.isDenied) {
-                                    // Email invoice
                                     emailInvoice(response.invoice_id);
                                 } else {
                                     window.location.href = response.redirect_url;
@@ -368,7 +406,7 @@
                             text: response.message
                         });
                     }
-                                }
+                }
             });
         }
 
