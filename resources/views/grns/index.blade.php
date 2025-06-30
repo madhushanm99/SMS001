@@ -19,6 +19,8 @@
                     <th>Supplier</th>
                     <th>PO No</th>
                     <th>Invoice No</th>
+                    <th class="text-end">Total Amount</th>
+                    <th class="text-center">Payment Status</th>
                     <th class="text-center">Actions</th>
                 </tr>
             </thead>
@@ -30,28 +32,75 @@
                         <td>{{ $grn->supp_Cus_ID }}</td>
                         <td>{{ $grn->po_No ?? '-' }}</td>
                         <td>{{ $grn->invoice_no ?? '-' }}</td>
-                        {{-- <td>
-                            @if ($grn->status)
-                                <span class="badge badge-success">Active</span>
-                            @else
-                                <span class="badge badge-secondary">Deleted</span>
-                            @endif
-                        </td> --}}
+                        <td class="text-end">
+                            <strong>LKR {{ number_format($grn->total_amount, 2) }}</strong>
+                        </td>
+                        <td class="text-center">
+                            <div class="d-flex flex-column align-items-center">
+                                @if($grn->payment_status === 'paid')
+                                    <span class="badge bg-success mb-1">Fully Paid</span>
+                                @elseif($grn->payment_status === 'partially_paid')
+                                    <span class="badge bg-warning mb-1">Partially Paid</span>
+                                @else
+                                    <span class="badge bg-danger mb-1">Unpaid</span>
+                                @endif
+                                
+                                <small class="text-muted">
+                                    Paid: LKR {{ number_format($grn->paid_amount, 2) }}<br>
+                                    Balance: LKR {{ number_format($grn->outstanding_amount, 2) }}
+                                </small>
+                                
+                                @if($grn->outstanding_amount > 0)
+                                    <button 
+                                        type="button" 
+                                        class="btn btn-sm btn-outline-primary mt-1 payment-btn"
+                                        data-grn-id="{{ $grn->grn_id }}"
+                                        data-grn-no="{{ $grn->grn_no }}"
+                                        data-supplier-name="{{ $grn->supp_Cus_ID }}"
+                                        data-total-amount="{{ $grn->total_amount }}"
+                                        data-outstanding-amount="{{ $grn->outstanding_amount }}"
+                                        title="Record Payment">
+                                        <i class="bi bi-cash-coin"></i> Pay
+                                    </button>
+                                @endif
+                            </div>
+                        </td>
                         <td class="text-center">
                             @if ($grn->status)
-                                <a href="{{ route('grns.pdf', $grn->grn_id) }}" target="_blank"
-                                    class="btn btn-sm btn-outline-secondary">Print</a>
-                                <a href="{{ route('grns.edit', $grn->grn_id) }}" class="btn btn-sm btn-info">Edit</a>
-                                <form action="{{ route('grns.destroy', $grn->grn_id) }}" method="POST"
-                                    class="d-inline-block delete-form"> @csrf @method('DELETE') <button type="submit"
-                                        class="btn btn-sm btn-danger">Delete</button> </form>
+                                <div class="btn-group" role="group">
+                                    <a href="{{ route('grns.pdf', $grn->grn_id) }}" target="_blank"
+                                        class="btn btn-sm btn-outline-secondary" title="Print PDF">
+                                        <i class="bi bi-file-pdf"></i>
+                                    </a>
+                                    <a href="{{ route('grns.edit', $grn->grn_id) }}" 
+                                        class="btn btn-sm btn-info" title="Edit GRN">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    @if($grn->paymentTransactions->count() > 0)
+                                        <button type="button" 
+                                                class="btn btn-sm btn-success view-payments-btn"
+                                                data-grn-id="{{ $grn->grn_id }}"
+                                                data-grn-no="{{ $grn->grn_no }}"
+                                                title="View Payment History">
+                                            <i class="bi bi-clock-history"></i>
+                                        </button>
+                                    @endif
+                                    <form action="{{ route('grns.destroy', $grn->grn_id) }}" method="POST"
+                                        class="d-inline-block delete-form"> 
+                                        @csrf @method('DELETE') 
+                                        <button type="submit" class="btn btn-sm btn-danger" title="Delete GRN">
+                                            <i class="bi bi-trash"></i>
+                                        </button> 
+                                    </form>
+                                </div>
                             @else
                                 <span class="text-muted">-</span>
                             @endif
                         </td>
-                </tr> @empty <tr>
-                        <td colspan="7" class="text-center text-muted">No GRNs found.</td>
-                    </tr>
+                </tr>                 @empty 
+                <tr>
+                    <td colspan="8" class="text-center text-muted">No GRNs found.</td>
+                </tr>
                 @endforelse
             </tbody>
         </table>
@@ -59,7 +108,37 @@
     </div>
 
     <!-- Include Payment Prompt Modal -->
-    <x-payment-prompt type="grn" payment_type="cash_out" title="Record Supplier Payment" />
+    <x-payment-prompt 
+    type="grn" 
+    payment_type="cash_out" 
+    title="Record Supplier Payment"
+    :payment_methods="$paymentMethods"
+    :bank_accounts="$bankAccounts"
+    :payment_categories="$paymentCategories"
+/>
+
+    <!-- Payment History Modal -->
+    <div class="modal fade" id="paymentHistoryModal" tabindex="-1" aria-labelledby="paymentHistoryModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="paymentHistoryModalLabel">
+                        <i class="bi bi-clock-history me-2"></i>Payment History - <span id="historyGrnNo"></span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="paymentHistoryContent">
+                        <div class="text-center">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     @push('scripts')
         <script>
@@ -68,6 +147,80 @@
                     if (!confirm('Are you sure you want to delete this GRN?')) e.preventDefault();
                 });
             });
+
+            // Handle payment button clicks
+            $(document).on('click', '.payment-btn', function() {
+                const btn = $(this);
+                const grnId = btn.data('grn-id');
+                const grnNo = btn.data('grn-no');
+                const supplierName = btn.data('supplier-name');
+                const totalAmount = btn.data('total-amount');
+                const outstandingAmount = btn.data('outstanding-amount');
+
+                // Show payment prompt
+                showPaymentPrompt({
+                    type: 'grn',
+                    entity_id: grnId,
+                    entity_no: grnNo,
+                    party_name: supplierName,
+                    total_amount: totalAmount,
+                    outstanding_amount: outstandingAmount
+                });
+            });
+
+            // Handle view payment history button clicks
+            $(document).on('click', '.view-payments-btn', function() {
+                const btn = $(this);
+                const grnId = btn.data('grn-id');
+                const grnNo = btn.data('grn-no');
+
+                $('#historyGrnNo').text(grnNo);
+                $('#paymentHistoryModal').modal('show');
+                
+                // Load payment history
+                loadPaymentHistory(grnId);
+            });
+
+            function loadPaymentHistory(grnId) {
+                $('#paymentHistoryContent').html(`
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                `);
+
+                // You can create an API endpoint to fetch payment history
+                // For now, let's create a simple placeholder
+                setTimeout(() => {
+                    $('#paymentHistoryContent').html(`
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>
+                            Payment history feature is ready for implementation. 
+                            You can create an API endpoint to fetch detailed payment records for GRN ID: ${grnId}
+                        </div>
+                        <div class="text-center">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    `);
+                }, 1000);
+            }
+
+            // Override payment success callback to refresh the page
+            window.originalHandlePaymentSuccess = window.handlePaymentSuccess;
+            window.handlePaymentSuccess = function(data) {
+                // Show success message
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Payment Recorded Successfully!',
+                    text: `Payment of Rs. ${parseFloat(data.amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2})} has been recorded.`,
+                    showConfirmButton: true,
+                    confirmButtonText: 'OK'
+                }).then(() => {
+                    // Refresh the page to show updated payment information
+                    window.location.reload();
+                });
+            };
 
             // Check for GRN creation flash data and show payment prompt
             @if(session('grn_created'))

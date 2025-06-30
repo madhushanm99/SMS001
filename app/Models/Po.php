@@ -54,7 +54,7 @@ class Po extends Model
 
     public function paymentTransactions(): HasMany
     {
-        return $this->hasMany(PaymentTransaction::class, 'po_auto_id', 'po_Auto_ID');
+        return $this->hasMany(PaymentTransaction::class, 'purchase_order_id', 'po_Auto_ID');
     }
 
     // Payment-related methods

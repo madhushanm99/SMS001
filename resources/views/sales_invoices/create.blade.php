@@ -132,7 +132,14 @@
     </section>
 
     <!-- Include Payment Prompt Modal -->
-    <x-payment-prompt type="invoice" payment_type="cash_in" title="Record Customer Payment" />
+    <x-payment-prompt 
+    type="invoice" 
+    payment_type="cash_in" 
+    title="Record Customer Payment"
+    :payment_methods="$paymentMethods"
+    :bank_accounts="$bankAccounts"
+    :payment_categories="$paymentCategories"
+/>
 
     @push('scripts')
     <script>

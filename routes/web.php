@@ -219,6 +219,7 @@ Route::middleware([
         // Integrated payment creation routes
         Route::post('/sales-invoices/{invoice}/create-payment', [SalesInvoiceController::class, 'createPayment'])->name('sales_invoices.create_payment');
         Route::post('/grns/{grn}/create-payment', [GRNController::class, 'createPayment'])->name('grns.create_payment');
+        Route::post('/purchase-returns/{purchase_return}/create-payment', [PurchaseReturnController::class, 'createPayment'])->name('purchase_returns.create_payment');
 
         // Payment Methods
         Route::prefix('payment-methods')->name('payment-methods.')->group(function () {

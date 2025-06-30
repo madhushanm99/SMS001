@@ -22,10 +22,34 @@ class GRNController extends Controller
     public function index()
     {
         $grns = GRN::where('status', 1)
+            ->with(['items', 'paymentTransactions' => function($query) {
+                $query->where('status', 'completed');
+            }])
             ->orderByDesc('grn_id')
             ->paginate(10);
 
-        return view('grns.index', compact('grns'));
+        // Calculate payment status for each GRN
+        foreach ($grns as $grn) {
+            $grn->total_amount = $grn->items->sum('line_total');
+            $grn->paid_amount = $grn->getTotalPayments();
+            $grn->outstanding_amount = $grn->getOutstandingAmount();
+            $grn->payment_status = $grn->getPaymentStatus();
+        }
+
+        // Get payment methods and bank accounts for payment prompt
+        $paymentMethods = \App\Models\PaymentMethod::where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'code', 'is_active']);
+            
+        $bankAccounts = \App\Models\BankAccount::orderBy('account_name')
+            ->get(['id', 'account_name', 'bank_name']);
+            
+        $paymentCategories = \App\Models\PaymentCategory::where('is_active', true)
+            ->where('type', 'expense')
+            ->orderBy('name')
+            ->get(['id', 'name', 'description', 'type']);
+
+        return view('grns.index', compact('grns', 'paymentMethods', 'bankAccounts', 'paymentCategories'));
     }
 
     public function create()
@@ -157,6 +181,7 @@ class GRNController extends Controller
                 'supplier_id' => $request->supp_Cus_ID,
                 'supplier_name' => $supplier->Supp_Name ?? 'Unknown Supplier',
                 'total_amount' => $totalAmount,
+                'outstanding_amount' => $totalAmount, // For new GRN, outstanding equals total
                 'prompt_payment' => true
             ]);
             
@@ -311,17 +336,9 @@ class GRNController extends Controller
             $grn = \App\Models\GRN::findOrFail($request->grn_id);
             $supplier = \App\Models\Supplier::where('Supp_CustomID', $grn->supp_Cus_ID)->first();
             
-            // Calculate GRN total
-            $grnItems = \App\Models\GRNItem::where('grn_id', $grn->grn_id)->get();
-            $grnTotal = $grnItems->sum('line_total');
-            
-            // Check existing payments
-            $existingPayments = \App\Models\PaymentTransaction::where('po_auto_id', $grn->po_Auto_ID)
-                ->where('type', 'cash_out')
-                ->where('status', 'completed')
-                ->sum('amount');
-            
-            $outstandingAmount = $grnTotal - $existingPayments;
+            // Calculate GRN total and outstanding amount using the model methods
+            $grnTotal = $grn->items->sum('line_total');
+            $outstandingAmount = $grn->getOutstandingAmount();
 
             if ($request->amount > $outstandingAmount) {
                 return response()->json([
@@ -341,8 +358,9 @@ class GRNController extends Controller
                 'payment_method_id' => $request->payment_method_id,
                 'bank_account_id' => $request->bank_account_id,
                 'payment_category_id' => $request->payment_category_id,
-                'supplier_custom_id' => $grn->supp_Cus_ID,
-                'po_auto_id' => $grn->po_Auto_ID,
+                'supplier_id' => $grn->supp_Cus_ID,
+                'purchase_order_id' => $grn->po_Auto_ID,
+                'grn_id' => $grn->grn_id,
                 'reference_no' => $request->reference_no,
                 'status' => 'completed',
                 'created_by' => auth()->user()->name ?? 'System',
@@ -360,7 +378,9 @@ class GRNController extends Controller
 
             DB::commit();
 
-            $remainingBalance = $outstandingAmount - $request->amount;
+            // Refresh the GRN to get updated payment information
+            $grn->refresh();
+            $remainingBalance = $grn->getOutstandingAmount();
 
             return response()->json([
                 'success' => true,

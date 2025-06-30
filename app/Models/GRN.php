@@ -32,6 +32,44 @@ class GRN extends Model
         return $this->belongsTo(Supplier::class, 'supp_Cus_ID', 'Supp_CustomID');
     }
 
+    public function paymentTransactions()
+    {
+        return $this->hasMany(PaymentTransaction::class, 'grn_id', 'grn_id');
+    }
+
+    public function getTotalPayments(): float
+    {
+        return $this->paymentTransactions()
+            ->where('type', 'cash_out')
+            ->where('status', 'completed')
+            ->sum('amount');
+    }
+
+    public function getOutstandingAmount(): float
+    {
+        $total = $this->items->sum('line_total');
+        return $total - $this->getTotalPayments();
+    }
+
+    public function isFullyPaid(): bool
+    {
+        return $this->getOutstandingAmount() <= 0;
+    }
+
+    public function getPaymentStatus(): string
+    {
+        $totalPayments = $this->getTotalPayments();
+        $outstanding = $this->getOutstandingAmount();
+
+        if ($totalPayments <= 0) {
+            return 'unpaid';
+        } elseif ($outstanding <= 0) {
+            return 'paid';
+        } else {
+            return 'partially_paid';
+        }
+    }
+
     public static function generateGRNNumber(): string
     {
         $lastGRN = self::latest('grn_no')->first();

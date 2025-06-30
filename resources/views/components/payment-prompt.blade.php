@@ -1,7 +1,10 @@
 @props([
     'type' => 'invoice', // 'invoice' or 'grn'
     'title' => 'Record Payment',
-    'payment_type' => 'cash_in' // 'cash_in' for invoices, 'cash_out' for GRNs
+    'payment_type' => 'cash_in', // 'cash_in' for invoices, 'cash_out' for GRNs
+    'payment_methods' => null,
+    'bank_accounts' => null,
+    'payment_categories' => null
 ])
 
 <!-- Payment Prompt Modal -->
@@ -17,17 +20,17 @@
             <div class="modal-body">
                 <div class="alert alert-info">
                     <i class="bi bi-info-circle me-2"></i>
-                    <strong>{{ $type == 'invoice' ? 'Sales Invoice' : 'GRN' }} Created Successfully!</strong><br>
-                    Would you like to record a {{ $payment_type == 'cash_in' ? 'payment from the customer' : 'payment to the supplier' }} now?
+                    <strong id="alert-message">{{ $type == 'invoice' ? 'Sales Invoice' : 'GRN' }} Created Successfully!</strong><br>
+                    <span id="alert-question">Would you like to record a {{ $payment_type == 'cash_in' ? 'payment from the customer' : 'payment to the supplier' }} now?</span>
                 </div>
 
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <div class="card border-primary h-100">
                             <div class="card-body">
-                                <h6 class="card-title">{{ $type == 'invoice' ? 'Invoice' : 'GRN' }} Details</h6>
+                                <h6 class="card-title" id="details-title">{{ $type == 'invoice' ? 'Invoice' : 'GRN' }} Details</h6>
                                 <p class="mb-1"><strong>Number:</strong> <span id="modal-entity-no"></span></p>
-                                <p class="mb-1"><strong>{{ $type == 'invoice' ? 'Customer' : 'Supplier' }}:</strong> <span id="modal-party-name"></span></p>
+                                <p class="mb-1"><strong id="party-label">{{ $type == 'invoice' ? 'Customer' : 'Supplier' }}:</strong> <span id="modal-party-name"></span></p>
                                 <p class="mb-0"><strong>Total Amount:</strong> LKR <span id="modal-total-amount">0.00</span></p>
                                 <p class="mb-0"><strong>Outstanding:</strong> LKR <span id="modal-outstanding-amount">0.00</span></p>
                             </div>
@@ -92,6 +95,8 @@
                                     <option value="">Select Category</option>
                                 </select>
                                 <div class="invalid-feedback"></div>
+                                <!-- Hidden input for GRN default category -->
+                                <input type="hidden" id="grn_default_category" value="5">
                             </div>
                         </div>
                     </div>
@@ -172,6 +177,125 @@ try {
     window.currentPaymentType = '{{ $payment_type }}';
     window.currentRouteTemplate = '';
     window.currentInvoiceData = null;
+    
+    // Update labels based on entity type
+    window.updateEntityLabels = function() {
+        const entityType = window.currentEntityType || '{{ $type }}';
+        
+        if (entityType === 'purchase_return') {
+            $('#details-title').text('Purchase Return Details');
+            $('#party-label').text('Supplier:');
+            $('#alert-message').text('Purchase Return Created Successfully!');
+            $('#alert-question').text('Would you like to record a refund from the supplier now?');
+        } else if (entityType === 'grn') {
+            $('#details-title').text('GRN Details');
+            $('#party-label').text('Supplier:');
+            $('#alert-message').text('GRN Created Successfully!');
+            $('#alert-question').text('Would you like to record a payment to the supplier now?');
+        } else if (entityType === 'invoice') {
+            $('#details-title').text('Invoice Details');
+            $('#party-label').text('Customer:');
+            $('#alert-message').text('Sales Invoice Created Successfully!');
+            $('#alert-question').text('Would you like to record a payment from the customer now?');
+        }
+    };
+    
+    // Backend data (with null checking)
+    window.backendPaymentMethods = @json($payment_methods ?? []);
+    window.backendBankAccounts = @json($bank_accounts ?? []);
+    window.backendPaymentCategories = @json($payment_categories ?? []);
+
+    // Helper functions
+    window.populatePaymentMethods = function(methods) {
+        const $paymentMethodSelect = $('#payment_method_id');
+        $paymentMethodSelect.empty().append('<option value="">Select Payment Method</option>');
+        
+        methods.forEach(function(method) {
+            if (method.is_active !== false) {
+                $paymentMethodSelect.append(
+                    `<option value="${method.id}" data-requires-bank="${method.name === 'Bank Transfer' ? 'true' : 'false'}">${method.name}</option>`
+                );
+            }
+        });
+        
+        // Add event listeners
+        attachPaymentMethodChangeHandlers($paymentMethodSelect);
+    };
+    
+    window.populateBankAccounts = function(accounts) {
+        const $bankAccountSelect = $('#bank_account_id');
+        $bankAccountSelect.empty().append('<option value="">Select Bank Account</option>');
+        
+        accounts.forEach(function(account) {
+            $bankAccountSelect.append(
+                `<option value="${account.id}">${account.account_name} - ${account.bank_name}</option>`
+            );
+        });
+    };
+    
+    window.attachPaymentMethodChangeHandlers = function($select) {
+        $select.off('change.bankAccount').on('change.bankAccount', function() {
+            const selectedOption = $(this).find('option:selected');
+            const requiresBank = selectedOption.data('requires-bank') === 'true';
+            const methodName = selectedOption.text();
+            
+            const isBankTransfer = requiresBank || methodName.toLowerCase().includes('bank transfer');
+            
+            if (isBankTransfer) {
+                $('#bank-account-group').show();
+                $('#bank_account_id').attr('required', true);
+            } else {
+                $('#bank-account-group').hide();
+                $('#bank_account_id').removeAttr('required').val('');
+            }
+        });
+    };
+    
+    window.loadBankAccountsFromAPI = function() {
+        fetch('/bank-accounts/', {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success && data.data) {
+                populateBankAccounts(data.data);
+            }
+        })
+        .catch(error => {
+            console.error('Failed to load bank accounts:', error);
+            const $bankAccountSelect = $('#bank_account_id');
+            $bankAccountSelect.empty().append('<option value="">Select Bank Account</option>');
+            $bankAccountSelect.append('<option value="1">Main Business Account</option>');
+        });
+    };
+    
+    window.handlePaymentCategories = function() {
+        if (window.currentEntityType === 'invoice') {
+            $('#category-group').show();
+            $('#payment_category_id').attr('required', true).val('2');
+            if ($('#backup_category_id').length === 0) {
+                $('#paymentForm').append(`<input type="hidden" id="backup_category_id" name="payment_category_id" value="2">`);
+            }
+        } else if (window.currentEntityType === 'grn' || window.currentEntityType === 'purchase_return') {
+            $('#category-group').hide();
+            $('#payment_category_id').removeAttr('required').val('5');
+            if ($('#backup_grn_category_id').length === 0) {
+                $('#paymentForm').append(`<input type="hidden" id="backup_grn_category_id" name="payment_category_id" value="5">`);
+            }
+        }
+    };
 
     // Global functions for payment prompt
     window.loadPaymentOptions = function() {
@@ -188,22 +312,46 @@ try {
             executeLoadPaymentOptions();
         }
         
-        function executeLoadPaymentOptions() {
-            // Load payment methods
-            fetch('/payment-methods/', {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                function executeLoadPaymentOptions() {
+            // First try to load from backend data
+            if (window.backendPaymentMethods && Array.isArray(window.backendPaymentMethods) && window.backendPaymentMethods.length > 0) {
+                populatePaymentMethods(window.backendPaymentMethods);
+                
+                // Load bank accounts from backend
+                if (window.backendBankAccounts && Array.isArray(window.backendBankAccounts) && window.backendBankAccounts.length > 0) {
+                    populateBankAccounts(window.backendBankAccounts);
+                } else {
+                    loadBankAccountsFromAPI();
                 }
-            })
-                .then(response => response.json())
-                .then(data => {
-                    const $paymentMethodSelect = $('#payment_method_id');
-                    $paymentMethodSelect.empty().append('<option value="">Select Payment Method</option>');
-                    
-                    if (data.success && data.data) {
+                
+                // Handle payment categories
+                handlePaymentCategories();
+                
+                return;
+            }
+            
+            // Fallback to API if backend data not available
+            fetch('/payment-methods/', {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    }
+                })
+                                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        const $paymentMethodSelect = $('#payment_method_id');
+                        $paymentMethodSelect.empty().append('<option value="">Select Payment Method</option>');
+                        
+                        if (data.success && data.data) {
                         data.data.forEach(function(method) {
                             if (method.is_active) {
                                 $paymentMethodSelect.append(
@@ -245,16 +393,26 @@ try {
                     }
                     
                     // Load bank accounts
+                    console.log('Loading bank accounts...');
                     fetch('/bank-accounts/', {
                         method: 'GET',
+                        credentials: 'same-origin',
                         headers: {
                             'Accept': 'application/json',
                             'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
                             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                         }
                     })
-                        .then(response => response.json())
+                        .then(response => {
+                            console.log('Bank accounts response status:', response.status);
+                            if (!response.ok) {
+                                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                            }
+                            return response.json();
+                        })
                         .then(data => {
+                            console.log('Bank accounts data:', data);
                             const $bankAccountSelect = $('#bank_account_id');
                             $bankAccountSelect.empty().append('<option value="">Select Bank Account</option>');
                             
@@ -266,7 +424,13 @@ try {
                                 });
                             }
                         })
-                        .catch(error => console.error('Failed to load bank accounts:', error));
+                        .catch(error => {
+                            console.error('Failed to load bank accounts:', error);
+                            const $bankAccountSelect = $('#bank_account_id');
+                            $bankAccountSelect.empty().append('<option value="">Select Bank Account</option>');
+                            // Add a default bank account as fallback
+                            $bankAccountSelect.append('<option value="1">Main Business Account</option>');
+                        });
 
                     // For invoices, automatically handle payment category
                     if (window.currentEntityType === 'invoice') {
@@ -283,9 +447,11 @@ try {
                         
                         fetch(`/payment-categories/?type=${categoryType}`, {
                             method: 'GET',
+                            credentials: 'same-origin',
                             headers: {
                                 'Accept': 'application/json',
                                 'Content-Type': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
                                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                             }
                         })
@@ -318,14 +484,25 @@ try {
                             .catch(error => {
                                 // Silently handle errors - fallback is already in place
                             });
+                    } else if (window.currentEntityType === 'grn') {
+                        // For GRN payments, hide category selector and set default to Supplier Payments (ID: 5)
+                        $('#category-group').hide();
+                        $('#payment_category_id').val('5');
+                        
+                        // Add hidden backup field for GRN payments
+                        if ($('#backup_grn_category_id').length === 0) {
+                            $('#paymentForm').append(`<input type="hidden" id="backup_grn_category_id" name="payment_category_id" value="5">`);
+                        }
                     } else {
-                        // Load payment categories normally for non-invoice entities
+                        // Load payment categories normally for other entities
                         const categoryType = window.currentPaymentType === 'cash_in' ? 'income' : 'expense';
                         fetch(`/payment-categories/?type=${categoryType}`, {
                             method: 'GET',
+                            credentials: 'same-origin',
                             headers: {
                                 'Accept': 'application/json',
                                 'Content-Type': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
                                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                             }
                         })
@@ -338,7 +515,7 @@ try {
                                     data.data.forEach(function(category) {
                                         if (category.type === categoryType && category.is_active) {
                                             $categorySelect.append(
-                                                `<option value="${category.id}">${category.full_name || category.name}</option>`
+                                                `<option value="${category.id}">${category.description || category.name}</option>`
                                             );
                                         }
                                     });
@@ -347,7 +524,27 @@ try {
                             .catch(error => console.error('Failed to load payment categories:', error));
                     }
                 })
-                .catch(error => console.error('Failed to load payment methods:', error));
+                .catch(error => {
+                    console.error('Failed to load payment methods:', error);
+                    const $paymentMethodSelect = $('#payment_method_id');
+                    $paymentMethodSelect.empty().append('<option value="">Select Payment Method</option>');
+                    // Add a few default payment methods as fallback
+                    $paymentMethodSelect.append('<option value="1">Cash</option>');
+                    $paymentMethodSelect.append('<option value="2" data-requires-bank="true">Bank Transfer</option>');
+                    $paymentMethodSelect.append('<option value="3">Credit Card</option>');
+                    $paymentMethodSelect.append('<option value="4">Check</option>');
+                    
+                    // Add event listener for payment method change (fallback)
+                    attachPaymentMethodChangeHandlers($paymentMethodSelect);
+                    
+                    // Load bank accounts fallback
+                    const $bankAccountSelect = $('#bank_account_id');
+                    $bankAccountSelect.empty().append('<option value="">Select Bank Account</option>');
+                    $bankAccountSelect.append('<option value="1">Main Business Account</option>');
+                    
+                    // Handle payment categories
+                    handlePaymentCategories();
+                });
         }
     };
 } catch (error) {
@@ -561,7 +758,13 @@ try {
                     $('#paymentPromptModal').modal('hide');
                     
                     // Show payment success and ask about PDF
-                    Swal.fire({
+                    // Determine entity type and appropriate actions
+                    const entityType = window.currentEntityType || 'invoice';
+                    const isGRN = entityType === 'grn';
+                    const entityData = window.currentInvoiceData;
+                    
+                    // Configure dialog based on entity type
+                    const dialogConfig = {
                         icon: 'success',
                         title: 'Payment Recorded Successfully!',
                         html: `
@@ -573,25 +776,33 @@ try {
                                 </div>
                             </div>
                         `,
-                        showDenyButton: true,
                         showCancelButton: true,
-                        confirmButtonText: '<i class="bi bi-file-pdf me-1"></i>View PDF',
-                        denyButtonText: '<i class="bi bi-envelope me-1"></i>Email Invoice',
-                        cancelButtonText: '<i class="bi bi-list me-1"></i>Go to Invoice List',
+                        confirmButtonText: `<i class="bi bi-file-pdf me-1"></i>View ${isGRN ? 'GRN' : 'Invoice'} PDF`,
+                        cancelButtonText: `<i class="bi bi-list me-1"></i>Go to ${isGRN ? 'GRN' : 'Invoice'} List`,
                         confirmButtonColor: '#dc3545',
-                        denyButtonColor: '#28a745',
                         cancelButtonColor: '#6c757d'
-                    }).then((result) => {
-                        if (result.isConfirmed && window.currentInvoiceData) {
-                            // Open PDF in new tab
-                            window.open(`/sales-invoices/${window.currentInvoiceData.entity_id}/pdf`, '_blank');
-                        } else if (result.isDenied && window.currentInvoiceData) {
-                            // Email invoice
-                            emailInvoice(window.currentInvoiceData.entity_id);
+                    };
+                    
+                    // Only show email option for invoices
+                    if (!isGRN) {
+                        dialogConfig.showDenyButton = true;
+                        dialogConfig.denyButtonText = '<i class="bi bi-envelope me-1"></i>Email Invoice';
+                        dialogConfig.denyButtonColor = '#28a745';
+                    }
+                    
+                    Swal.fire(dialogConfig).then((result) => {
+                        if (result.isConfirmed && entityData) {
+                            // Open PDF in new tab - use appropriate URL
+                            const pdfUrl = isGRN ? `/grns/${entityData.entity_id}/pdf` : `/sales-invoices/${entityData.entity_id}/pdf`;
+                            window.open(pdfUrl, '_blank');
+                        } else if (result.isDenied && entityData && !isGRN) {
+                            // Email invoice (only for invoices)
+                            emailInvoice(entityData.entity_id);
                         }
-                        // Always redirect to invoice list
+                        // Redirect to appropriate list page
                         setTimeout(() => {
-                            window.location.href = '/sales-invoices';
+                            const redirectUrl = isGRN ? '/grns' : '/sales-invoices';
+                            window.location.href = redirectUrl;
                         }, 1000);
                     });
                 } else {
@@ -636,16 +847,30 @@ try {
         // Close payment modal
         $('#paymentPromptModal').modal('hide');
         
+        // Determine entity type and appropriate redirect
+        const entityType = window.currentEntityType || 'invoice';
+        let title, text, redirectUrl;
+        
+        if (entityType === 'grn') {
+            title = 'GRN Created Successfully!';
+            text = 'You can record payment later from the GRN list.';
+            redirectUrl = '/grns';
+        } else {
+            title = 'Invoice Created Successfully!';
+            text = 'You can record payment later from the invoice list.';
+            redirectUrl = '/sales-invoices';
+        }
+        
         // Show simple success alert with action button
         Swal.fire({
             icon: 'success',
-            title: 'Invoice Created Successfully!',
-            text: 'You can record payment later from the invoice list.',
-            confirmButtonText: '<i class="bi bi-list me-1"></i>Go to Invoice List',
+            title: title,
+            text: text,
+            confirmButtonText: `<i class="bi bi-list me-1"></i>Go to ${entityType === 'grn' ? 'GRN' : 'Invoice'} List`,
             confirmButtonColor: '#28a745'
         }).then((result) => {
             if (result.isConfirmed) {
-                window.location.href = '/sales-invoices';
+                window.location.href = redirectUrl;
             }
         });
     };
@@ -722,17 +947,18 @@ try {
                 $('#bank-account-group').hide();
                 $('#bank_account_id').removeAttr('required').val('');
                 
-                // Handle category field based on entity type
-                if (window.currentEntityType === 'invoice') {
-                    $('#category-group').hide();
-                    $('#payment_category_id').removeAttr('required');
-                } else {
-                    $('#category-group').show();
-                    $('#payment_category_id').attr('required', true);
-                }
+                // Update labels based on entity type
+                window.updateEntityLabels();
                 
-                // Load payment options
+                // Handle category field based on entity type - will be properly set in handlePaymentCategories()
+                
+                // Load payment options and handle categories
                 window.loadPaymentOptions();
+                
+                // Always call handlePaymentCategories to ensure proper visibility
+                setTimeout(function() {
+                    window.handlePaymentCategories();
+                }, 50);
             });
 
             // Add event for when modal is fully shown

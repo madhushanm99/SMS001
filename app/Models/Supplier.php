@@ -42,7 +42,7 @@ class Supplier extends Model
     // Relationships
     public function paymentTransactions(): HasMany
     {
-        return $this->hasMany(PaymentTransaction::class, 'supplier_custom_id', 'Supp_CustomID');
+        return $this->hasMany(PaymentTransaction::class, 'supplier_id', 'Supp_CustomID');
     }
 
     public function purchaseOrders(): HasMany

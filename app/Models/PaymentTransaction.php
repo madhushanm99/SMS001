@@ -24,6 +24,8 @@ class PaymentTransaction extends Model
         'supplier_id',
         'sales_invoice_id',
         'purchase_order_id',
+        'grn_id',
+        'purchase_return_id',
         'invoice_return_id',
         'status',
         'approved_by',
@@ -99,6 +101,16 @@ class PaymentTransaction extends Model
     public function purchaseOrder(): BelongsTo
     {
         return $this->belongsTo(Po::class, 'purchase_order_id', 'po_Auto_ID');
+    }
+
+    public function grn(): BelongsTo
+    {
+        return $this->belongsTo(GRN::class, 'grn_id', 'grn_id');
+    }
+
+    public function purchaseReturn(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseReturn::class);
     }
 
     public function invoiceReturn(): BelongsTo

@@ -71,13 +71,40 @@ class SalesInvoiceController extends Controller
             return view('sales_invoices.table', compact('invoices'))->render();
         }
 
-        return view('sales_invoices.index', compact('invoices'));
+        // Get payment methods and bank accounts for payment prompt
+        $paymentMethods = \App\Models\PaymentMethod::where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'code', 'is_active']);
+            
+        $bankAccounts = \App\Models\BankAccount::orderBy('account_name')
+            ->get(['id', 'account_name', 'bank_name']);
+            
+        $paymentCategories = \App\Models\PaymentCategory::where('is_active', true)
+            ->where('type', 'income')
+            ->orderBy('name')
+            ->get(['id', 'name', 'description', 'type']);
+
+        return view('sales_invoices.index', compact('invoices', 'paymentMethods', 'bankAccounts', 'paymentCategories'));
     }
 
     public function create()
     {
         session()->forget($this->sessionKey());
-        return view('sales_invoices.create');
+        
+        // Get payment methods and bank accounts for payment prompt
+        $paymentMethods = \App\Models\PaymentMethod::where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'code', 'is_active']);
+            
+        $bankAccounts = \App\Models\BankAccount::orderBy('account_name')
+            ->get(['id', 'account_name', 'bank_name']);
+            
+        $paymentCategories = \App\Models\PaymentCategory::where('is_active', true)
+            ->where('type', 'income')
+            ->orderBy('name')
+            ->get(['id', 'name', 'description', 'type']);
+        
+        return view('sales_invoices.create', compact('paymentMethods', 'bankAccounts', 'paymentCategories'));
     }
 
     public function searchCustomers(Request $request)

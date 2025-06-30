@@ -41,9 +41,18 @@
         </div>
 
         <div class="text-right">
-            <button type="submit" class="btn btn-primary">Submit Return</button>
+            <button type="submit" class="btn btn-primary" id="submit-return-btn">Submit Return</button>
         </div>
     </form>
+
+    <!-- Payment Prompt Modal -->
+    @include('components.payment-prompt', [
+        'type' => 'purchase_return',
+        'payment_type' => 'cash_in',
+        'payment_methods' => [],
+        'bank_accounts' => [],
+        'payment_categories' => []
+    ])
     @push('scripts')
         <script>
             const grnData =
@@ -79,6 +88,152 @@
                     }
                 }
             });
+
+            // Set global entity type for payment modal
+            window.currentEntityType = 'purchase_return';
+
+            // Global variables
+            let currentPurchaseReturnId = null;
+            let currentOutstandingAmount = 0;
+
+            // Handle form submission with payment prompt
+            document.getElementById('pr_form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(this);
+                formData.append('show_payment_prompt', '1'); // Request payment prompt
+                
+                const submitBtn = document.getElementById('submit-return-btn');
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Creating...';
+                
+                fetch('{{ route("purchase_returns.store") }}', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'same-origin'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.show_payment_prompt) {
+                        // Store purchase return data
+                        currentPurchaseReturnId = data.purchase_return_id;
+                        currentOutstandingAmount = parseFloat(data.total_amount) || 0;
+                        
+                        // Populate payment modal
+                        const totalAmount = parseFloat(data.total_amount) || 0;
+                        document.getElementById('modal-entity-no').textContent = data.return_no;
+                        document.getElementById('modal-party-name').textContent = data.supplier_name;
+                        document.getElementById('modal-total-amount').textContent = totalAmount.toLocaleString('en-US', {minimumFractionDigits: 2});
+                        document.getElementById('modal-outstanding-amount').textContent = totalAmount.toLocaleString('en-US', {minimumFractionDigits: 2});
+                        
+                        // Set payment amount to full amount
+                        document.getElementById('payment_amount').value = totalAmount.toFixed(2);
+                        document.getElementById('payment_amount').setAttribute('max', totalAmount);
+                        
+                        // Load payment methods
+                        populatePaymentMethods(data.payment_methods);
+                        populateBankAccounts(data.bank_accounts);
+                        populatePaymentCategories(data.payment_categories);
+                        
+                        // Show payment modal
+                        $('#paymentPromptModal').modal('show');
+                    } else {
+                        // Handle error or redirect
+                        window.location.href = '{{ route("purchase_returns.index") }}';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    Swal.fire('Error', 'An error occurred while creating the purchase return.', 'error');
+                })
+                .finally(() => {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = 'Submit Return';
+                });
+            });
+
+            function populatePaymentMethods(methods) {
+                const select = document.getElementById('payment_method_id');
+                select.innerHTML = '<option value="">-- Select Payment Method --</option>';
+                methods.forEach(method => {
+                    select.innerHTML += `<option value="${method.id}">${method.name}</option>`;
+                });
+            }
+
+            function populateBankAccounts(accounts) {
+                const select = document.getElementById('bank_account_id');
+                select.innerHTML = '<option value="">-- Select Bank Account --</option>';
+                accounts.forEach(account => {
+                    select.innerHTML += `<option value="${account.id}">${account.account_name} - ${account.account_number}</option>`;
+                });
+            }
+
+            function populatePaymentCategories(categories) {
+                const select = document.getElementById('payment_category_id');
+                select.innerHTML = '<option value="">-- Select Category --</option>';
+                categories.forEach(category => {
+                    select.innerHTML += `<option value="${category.id}">${category.description || category.name}</option>`;
+                });
+            }
+
+            function recordPayment() {
+                const formData = new FormData(document.getElementById('paymentForm'));
+                const submitBtn = document.getElementById('recordPaymentBtn');
+                
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Processing...';
+                
+                fetch(`/purchase-returns/${currentPurchaseReturnId}/create-payment`, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'same-origin'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        $('#paymentPromptModal').modal('hide');
+                        
+                        Swal.fire({
+                            title: 'Success!',
+                            text: 'Purchase return created and refund recorded successfully!',
+                            icon: 'success',
+                            confirmButtonText: 'OK'
+                        }).then(() => {
+                            window.location.href = '{{ route("purchase_returns.index") }}';
+                        });
+                    } else {
+                        Swal.fire('Error', data.message, 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Refund error:', error);
+                    Swal.fire('Error', 'An error occurred while processing the refund.', 'error');
+                })
+                .finally(() => {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="bi bi-cash-coin me-1"></i>Record Refund';
+                });
+            }
+
+            function skipPayment() {
+                $('#paymentPromptModal').modal('hide');
+                Swal.fire({
+                    title: 'Purchase Return Created!',
+                    text: 'Purchase return has been created successfully. Refund can be recorded later.',
+                    icon: 'success',
+                    confirmButtonText: 'OK'
+                }).then(() => {
+                    window.location.href = '{{ route("purchase_returns.index") }}';
+                });
+            }
         </script>
     @endpush
 </x-layout>

@@ -175,7 +175,14 @@
     </div>
 
     <!-- Include Payment Prompt Component -->
-    @include('components.payment-prompt')
+    <x-payment-prompt 
+        type="invoice" 
+        payment_type="cash_in" 
+        title="Record Customer Payment"
+        :payment_methods="$paymentMethods"
+        :bank_accounts="$bankAccounts"
+        :payment_categories="$paymentCategories"
+    />
 
     @push('scripts')
     <script>
