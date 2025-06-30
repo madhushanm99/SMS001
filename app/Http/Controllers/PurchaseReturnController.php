@@ -45,18 +45,49 @@ class PurchaseReturnController extends Controller
         $grn_items_by_grn_id = [];
 
         foreach ($grns as $grn) {
-            $items = GRNItem::where('grn_id', $grn->grn_id)->get()->map(function ($item) {
+            $items = GRNItem::where('grn_id', $grn->grn_id)->get()->map(function ($item) use ($grn) {
                 $stockQty = Stock::where('item_ID', $item->item_ID)->value('quantity') ?? 0;
+                
+                // Calculate the actual unit price with discount applied
+                $actualUnitPrice = $item->qty_received > 0 ? $item->line_total / $item->qty_received : $item->price;
+                
+                // Calculate total quantity already returned for this GRN item across all purchase returns
+                $totalReturned = PurchaseReturnItem::whereHas('return', function($query) use ($grn) {
+                    $query->where('grn_id', $grn->grn_id)->where('status', true);
+                })
+                ->where('item_ID', $item->item_ID)
+                ->sum('qty_returned');
+                
+                // Available quantity for return = GRN received quantity - already returned quantity
+                $availableForReturn = $item->qty_received - $totalReturned;
+                
+                // Maximum returnable quantity is the minimum of available for return and stock quantity
+                $maxReturnableQty = min($availableForReturn, $stockQty);
+                
                 return [
+                    'grn_item_id' => $item->grn_item_id,
                     'item_ID' => $item->item_ID,
                     'item_Name' => $item->item_Name,
                     'qty_received' => $item->qty_received,
-                    'price' => $item->price,
+                    'qty_already_returned' => $totalReturned,
+                    'available_for_return' => $availableForReturn,
+                    'original_price' => $item->price,
+                    'discount' => $item->discount ?? 0,
+                    'actual_unit_price' => $actualUnitPrice,
+                    'line_total' => $item->line_total,
                     'stock_qty' => $stockQty,
+                    'max_returnable_qty' => max(0, $maxReturnableQty), // Ensure never negative
                 ];
             });
 
-            $grn_items_by_grn_id[$grn->grn_id] = $items;
+            // Only include items that can still be returned
+            $items = $items->filter(function($item) {
+                return $item['max_returnable_qty'] > 0;
+            });
+
+            if ($items->count() > 0) {
+                $grn_items_by_grn_id[$grn->grn_id] = $items->values();
+            }
         }
 
         return view('purchase_returns.create', compact('grns', 'grn_items_by_grn_id'));
@@ -70,20 +101,48 @@ class PurchaseReturnController extends Controller
             'items' => 'required|array|min:1',
             'items.*.item_ID' => 'required|string',
             'items.*.qty_returned' => 'required|integer|min:1',
-            'items.*.price' => 'required|numeric',
+            'items.*.actual_unit_price' => 'required|numeric',
         ]);
 
         DB::beginTransaction();
         try {
-            // Stock validation
+            $grn = GRN::findOrFail($request->grn_id);
+
+            // Validate each item against GRN quantities and existing returns
             foreach ($request->items as $item) {
+                // Check stock availability
                 $stock = Stock::where('item_ID', $item['item_ID'])->value('quantity') ?? 0;
                 if ($item['qty_returned'] > $stock) {
-                    return back()->with('error', "Cannot return {$item['item_ID']}, not enough stock.");
+                    return back()->with('error', "Cannot return {$item['item_ID']}, not enough stock (Available: {$stock}).");
+                }
+
+                // Get the original GRN item
+                $grnItem = GRNItem::where('grn_id', $grn->grn_id)
+                    ->where('item_ID', $item['item_ID'])
+                    ->first();
+
+                if (!$grnItem) {
+                    return back()->with('error', "Item {$item['item_ID']} was not found in GRN {$grn->grn_no}.");
+                }
+
+                // Calculate total quantity already returned for this GRN item
+                $totalAlreadyReturned = PurchaseReturnItem::whereHas('return', function($query) use ($grn) {
+                    $query->where('grn_id', $grn->grn_id)->where('status', true);
+                })
+                ->where('item_ID', $item['item_ID'])
+                ->sum('qty_returned');
+
+                // Check if new return would exceed original GRN quantity
+                $totalAfterReturn = $totalAlreadyReturned + $item['qty_returned'];
+                if ($totalAfterReturn > $grnItem->qty_received) {
+                    return back()->with('error', 
+                        "Cannot return {$item['qty_returned']} of {$item['item_ID']}. " .
+                        "GRN received: {$grnItem->qty_received}, " .
+                        "Already returned: {$totalAlreadyReturned}, " .
+                        "Available for return: " . ($grnItem->qty_received - $totalAlreadyReturned)
+                    );
                 }
             }
-
-            $grn = GRN::findOrFail($request->grn_id);
 
             $return = PurchaseReturn::create([
                 'return_no' => PurchaseReturn::generateReturnNo(),
@@ -101,8 +160,8 @@ class PurchaseReturnController extends Controller
                     'item_ID' => $item['item_ID'],
                     'item_Name' => $item['item_Name'],
                     'qty_returned' => $item['qty_returned'],
-                    'price' => $item['price'],
-                    'line_total' => $item['qty_returned'] * $item['price'],
+                    'price' => $item['actual_unit_price'],
+                    'line_total' => $item['qty_returned'] * $item['actual_unit_price'],
                     'reason' => $item['reason'] ?? null,
                 ]);
 

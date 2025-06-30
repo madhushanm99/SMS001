@@ -49,24 +49,37 @@
                 <th>Item Name</th>
                 <th>Qty</th>
                 <th>Price</th>
+                <th>Discount (%)</th>
+                <th>Discount Value</th>
                 <th>Line Total</th>
             </tr>
         </thead>
         <tbody>
+            @php
+                $totalDiscount = 0;
+            @endphp
             @foreach ($items as $i => $item)
+                @php
+                    $discountValue = ($item->price * $item->qty_received * ($item->discount ?? 0)) / 100;
+                    $totalDiscount += $discountValue;
+                @endphp
                 <tr>
                     <td>{{ $i + 1 }}</td>
                     <td>{{ $item->item_ID }}</td>
                     <td>{{ $item->item_Name }}</td>
                     <td>{{ $item->qty_received }}</td>
                     <td>Rs. {{ number_format($item->price, 2) }}</td>
+                    <td>{{ number_format($item->discount ?? 0, 2) }}%</td>
+                    <td>Rs. {{ number_format($discountValue, 2) }}</td>
                     <td>Rs. {{ number_format($item->line_total, 2) }}</td>
                 </tr>
             @endforeach
         </tbody>
     </table>
-    <p style="text-align: right; font-weight: bold;">Grand Total: Rs. {{ number_format($items->sum('line_total'), 2) }}
-    </p>
+    <div style="text-align: right; font-weight: bold;">
+        <p>Total Discount: Rs. {{ number_format($totalDiscount, 2) }}</p>
+        <p>Grand Total: Rs. {{ number_format($items->sum('line_total'), 2) }}</p>
+    </div>
 </body>
 
 </html>

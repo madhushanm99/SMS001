@@ -70,6 +70,26 @@ class GRN extends Model
         }
     }
 
+    public function getTotalReturnedQuantity($itemId): int
+    {
+        return \App\Models\PurchaseReturnItem::whereHas('return', function($query) {
+            $query->where('grn_id', $this->grn_id)->where('status', true);
+        })
+        ->where('item_ID', $itemId)
+        ->sum('qty_returned');
+    }
+
+    public function getAvailableReturnQuantity($itemId): int
+    {
+        $grnItem = $this->items()->where('item_ID', $itemId)->first();
+        if (!$grnItem) {
+            return 0;
+        }
+        
+        $totalReturned = $this->getTotalReturnedQuantity($itemId);
+        return max(0, $grnItem->qty_received - $totalReturned);
+    }
+
     public static function generateGRNNumber(): string
     {
         $lastGRN = self::latest('grn_no')->first();

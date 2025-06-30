@@ -16,7 +16,8 @@ class StockController extends Controller
             'item.item_Name',
             'item.sales_Price',
             'item.units as reorder_level',
-            DB::raw('COALESCE(stock.quantity, 0) as qty')
+            DB::raw('COALESCE(stock.quantity, 0) as qty'),
+            DB::raw('COALESCE(stock.cost_value, 0) as cost_value')
         )
             ->leftJoin('stock', 'item.item_ID', '=', 'stock.item_ID')
             ->where('item.status', true);

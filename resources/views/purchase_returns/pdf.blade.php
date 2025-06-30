@@ -43,7 +43,7 @@
                 <th>#</th>
                 <th>Item</th>
                 <th>Qty</th>
-                <th>Price</th>
+                <th>Unit Price (After Discount)</th>
                 <th>Reason</th>
                 <th>Total</th>
             </tr>

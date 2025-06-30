@@ -12,6 +12,7 @@ class Stock extends Model
     protected $fillable = [
         'item_ID',
         'quantity',
+        'cost_value',
         'updated_at',
     ];
 
@@ -30,6 +31,26 @@ class Stock extends Model
             self::create([
                 'item_ID' => $itemId,
                 'quantity' => $quantity,
+                'cost_value' => 0, // Will be updated by updateCostIfHigher method
+            ]);
+        }
+    }
+
+    public static function updateCostIfHigher($itemId, $grnUnitCost)
+    {
+        $stock = self::where('item_ID', $itemId)->first();
+        
+        if ($stock) {
+            // Update cost only if GRN cost is higher than current cost
+            if ($grnUnitCost > $stock->cost_value) {
+                $stock->update(['cost_value' => $grnUnitCost]);
+            }
+        } else {
+            // Create new stock record with the GRN cost
+            self::create([
+                'item_ID' => $itemId,
+                'quantity' => 0,
+                'cost_value' => $grnUnitCost,
             ]);
         }
     }
@@ -44,6 +65,11 @@ class Stock extends Model
         }
         
         return false;
+    }
+
+    public static function decrease($itemId, $quantity)
+    {
+        return self::reduce($itemId, $quantity);
     }
 
 }

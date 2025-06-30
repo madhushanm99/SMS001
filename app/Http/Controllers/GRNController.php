@@ -63,6 +63,7 @@ class GRNController extends Controller
         $request->validate([
             'item_id' => 'required|string',
             'qty' => 'required|integer|min:1',
+            'discount' => 'nullable|numeric|min:0|max:100',
         ]);
         $item = Products::where('item_ID', $request->item_id)->first();
         if (!$item) {
@@ -71,12 +72,19 @@ class GRNController extends Controller
 
         $key = $this->sessionKey();
         $items = session()->get($key, []);
+        
+        $discount = $request->discount ?? 0;
+        $subtotal = $request->qty * $item->sales_Price;
+        $discountAmount = ($subtotal * $discount) / 100;
+        $lineTotal = $subtotal - $discountAmount;
 
         // Prevent duplicates: merge if exists
         foreach ($items as &$existing) {
             if ($existing['item_ID'] === $item->item_ID) {
                 $existing['qty'] += $request->qty;
-                $existing['line_total'] = $existing['qty'] * $existing['price'];
+                $existingSubtotal = $existing['qty'] * $existing['price'];
+                $existingDiscountAmount = ($existingSubtotal * $existing['discount']) / 100;
+                $existing['line_total'] = $existingSubtotal - $existingDiscountAmount;
                 session([$key => $items]);
                 return response()->json(['success' => true, 'items' => $items]);
             }
@@ -87,7 +95,8 @@ class GRNController extends Controller
             'description' => $item->item_Name,
             'price' => $item->sales_Price,
             'qty' => $request->qty,
-            'line_total' => $request->qty * $item->sales_Price,
+            'discount' => $discount,
+            'line_total' => $lineTotal,
         ];
 
         session([$key => $items]);
@@ -155,11 +164,16 @@ class GRNController extends Controller
                     'item_Name' => $item['description'],
                     'qty_received' => $item['qty'],
                     'price' => $item['price'],
+                    'discount' => $item['discount'] ?? 0,
                     'line_total' => $item['line_total'],
                 ]);
 
-                // Update stock
+                // Update stock quantity
                 Stock::increase($item['item_ID'], $item['qty']);
+                
+                // Calculate discounted unit cost and update stock cost if higher
+                $discountedUnitCost = $item['qty'] > 0 ? $item['line_total'] / $item['qty'] : $item['price'];
+                Stock::updateCostIfHigher($item['item_ID'], $discountedUnitCost);
 
                 // Update item price if GRN price is higher
                 Products::updatePriceIfHigher($item['item_ID'], $item['price']);
@@ -205,6 +219,7 @@ class GRNController extends Controller
                 'description' => $item->item_Name,
                 'price' => $item->price,
                 'qty' => $item->qty_received,
+                'discount' => $item->discount ?? 0,
                 'line_total' => $item->line_total,
             ];
         }
@@ -254,10 +269,18 @@ class GRNController extends Controller
                     'item_Name' => $item['description'],
                     'qty_received' => $item['qty'],
                     'price' => $item['price'],
+                    'discount' => $item['discount'] ?? 0,
                     'line_total' => $item['line_total'],
                 ]);
 
+                // Update stock quantity
                 Stock::increase($item['item_ID'], $item['qty']);
+                
+                // Calculate discounted unit cost and update stock cost if higher
+                $discountedUnitCost = $item['qty'] > 0 ? $item['line_total'] / $item['qty'] : $item['price'];
+                Stock::updateCostIfHigher($item['item_ID'], $discountedUnitCost);
+                
+                // Update item price if GRN price is higher
                 Products::updatePriceIfHigher($item['item_ID'], $item['price']);
             }
 

@@ -4,7 +4,8 @@
             <th>Product ID</th>
             <th>Name</th>
             <th>Qty</th>
-            <th>Price</th>
+            <th>Cost Value</th>
+            <th>Selling Price</th>
             <th>Re-Order Level</th>
         </tr>
     </thead>
@@ -14,10 +15,11 @@
                 <td>{{ $item->item_ID }}</td>
                 <td>{{ $item->item_Name }}</td>
                 <td>{{ $item->qty }}</td>
+                <td>Rs. {{ number_format($item->cost_value, 2) }}</td>
                 <td>Rs. {{ number_format($item->sales_Price, 2) }}</td>
                 <td>{{ $item->reorder_level }}</td>
         </tr> @empty <tr>
-                <td colspan="5" class="text-center text-muted">No items found.</td>
+                <td colspan="6" class="text-center text-muted">No items found.</td>
             </tr>
         @endforelse
     </tbody>

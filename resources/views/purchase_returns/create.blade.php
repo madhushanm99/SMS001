@@ -19,20 +19,36 @@
         </div>
 
         <div id="grn_item_table_wrapper" class="d-none">
+            <div class="alert alert-info mb-3">
+                <i class="bi bi-info-circle me-2"></i>
+                <strong>Return Validation:</strong> You can only return items up to the original GRN received quantity. 
+                The "Available for Return" column shows how many more can be returned after accounting for previous returns from this GRN.
+                Stock availability also applies as a secondary constraint.
+            </div>
             <table class="table table-bordered table-sm text-sm">
                 <thead class="thead-light">
                     <tr>
                         <th>Item ID</th>
                         <th>Name</th>
-                        <th>Received</th>
-                        <th>Available</th>
+                        <th>GRN Received</th>
+                        <th>Already Returned</th>
+                        <th>Available for Return</th>
+                        <th>Stock Available</th>
+                        <th>Original Price</th>
+                        <th>Discount (%)</th>
+                        <th>Unit Price (After Discount)</th>
                         <th>Return Qty</th>
+                        <th>Return Value</th>
                         <th>Reason</th>
                         <th></th>
                     </tr>
                 </thead>
                 <tbody id="return_items_body"></tbody>
             </table>
+        </div>
+
+        <div class="text-right mb-3" id="return_summary" style="display: none;">
+            <strong>Total Return Value: Rs. <span id="total_return_value">0.00</span></strong>
         </div>
 
         <div class="form-group mt-3">
@@ -55,8 +71,7 @@
     ])
     @push('scripts')
         <script>
-            const grnData =
-                @json($grn_items_by_grn_id);
+            const grnData = @json($grn_items_by_grn_id);
 
             document.getElementById('grn_select').addEventListener('change', function() {
                 const grnId = this.value;
@@ -66,28 +81,119 @@
                 const items = grnData[grnId] || [];
                 const tbody = document.getElementById('return_items_body');
                 tbody.innerHTML = '';
+                
                 items.forEach((item, index) => {
-                    const maxQty = item.stock_qty >= item.qty_received ? item.qty_received : item.stock_qty;
-                    tbody.innerHTML +=
-                        ` <tr data-index="${index}"> <td> <input type="hidden" name="items[${index}][item_ID]" value="${item.item_ID}"> ${item.item_ID} </td> <td>${item.item_Name} <input type="hidden" name="items[${index}][item_Name]" value="${item.item_Name}"> </td> <td>${item.qty_received}</td> <td>${item.stock_qty}</td> <td> <input type="number" name="items[${index}][qty_returned]" class="form-control form-control-sm return_qty" max="${maxQty}" min="1" value="${maxQty}" required> <input type="hidden" name="items[${index}][price]" value="${item.price}"> </td> <td> <input type="text" name="items[${index}][reason]" class="form-control form-control-sm"> </td> <td> <button type="button" class="btn btn-sm btn-danger remove-row">X</button> </td> </tr> `;
-                });
-                document.getElementById('grn_item_table_wrapper').classList.remove('d-none');
-            });
-            document.getElementById('return_items_body').addEventListener('click', function(e) {
-                if (e.target.classList.contains('remove-row')) {
-                    e.target.closest('tr').remove();
-                }
-            });
-            document.getElementById('return_items_body').addEventListener('input', function(e) {
-                if (e.target.classList.contains('return_qty')) {
-                    const max = parseInt(e.target.getAttribute('max'), 10);
-                    const val = parseInt(e.target.value, 10);
-                    if (val > max) {
-                        alert('Return quantity cannot exceed available stock.');
-                        e.target.value = max;
+                    const maxQty = item.max_returnable_qty;
+                    const returnValue = maxQty * item.actual_unit_price;
+                    
+                    // Skip items that cannot be returned
+                    if (maxQty <= 0) {
+                        return;
                     }
-                }
+                    
+                    tbody.innerHTML += `
+                        <tr data-index="${index}"> 
+                            <td> 
+                                <input type="hidden" name="items[${index}][item_ID]" value="${item.item_ID}"> 
+                                ${item.item_ID} 
+                            </td> 
+                            <td>
+                                ${item.item_Name} 
+                                <input type="hidden" name="items[${index}][item_Name]" value="${item.item_Name}"> 
+                            </td> 
+                            <td>${item.qty_received}</td> 
+                            <td class="text-warning">${item.qty_already_returned}</td> 
+                            <td class="text-success"><strong>${item.available_for_return}</strong></td> 
+                            <td class="text-info">${item.stock_qty}</td> 
+                            <td>Rs. ${parseFloat(item.original_price).toFixed(2)}</td> 
+                            <td>${parseFloat(item.discount || 0).toFixed(2)}%</td> 
+                            <td>Rs. ${parseFloat(item.actual_unit_price).toFixed(2)}</td> 
+                            <td> 
+                                <input type="number" name="items[${index}][qty_returned]" 
+                                       class="form-control form-control-sm return_qty" 
+                                       max="${maxQty}" min="1" value="${Math.min(maxQty, 1)}" 
+                                       data-unit-price="${item.actual_unit_price}"
+                                       data-max-qty="${maxQty}"
+                                       data-index="${index}" required> 
+                                <input type="hidden" name="items[${index}][actual_unit_price]" value="${item.actual_unit_price}"> 
+                                <small class="text-muted">Max: ${maxQty}</small>
+                            </td> 
+                            <td class="return-value" data-index="${index}">
+                                Rs. ${(Math.min(maxQty, 1) * item.actual_unit_price).toFixed(2)}
+                            </td>
+                            <td> 
+                                <input type="text" name="items[${index}][reason]" class="form-control form-control-sm"> 
+                            </td> 
+                            <td> 
+                                <button type="button" class="btn btn-sm btn-danger remove-row">X</button> 
+                            </td> 
+                        </tr>
+                    `;
+                });
+                
+                document.getElementById('grn_item_table_wrapper').classList.remove('d-none');
+                document.getElementById('return_summary').style.display = 'block';
+                calculateTotalReturnValue();
+                attachEventListeners();
             });
+
+            function attachEventListeners() {
+                // Remove existing event listeners to avoid duplicates
+                document.querySelectorAll('.return_qty').forEach(input => {
+                    input.removeEventListener('input', handleQtyChange);
+                    input.addEventListener('input', handleQtyChange);
+                });
+
+                document.querySelectorAll('.remove-row').forEach(button => {
+                    button.removeEventListener('click', handleRemoveRow);
+                    button.addEventListener('click', handleRemoveRow);
+                });
+            }
+
+            function handleQtyChange(event) {
+                const input = event.target;
+                const index = input.dataset.index;
+                const unitPrice = parseFloat(input.dataset.unitPrice);
+                const maxQty = parseInt(input.dataset.maxQty);
+                let qty = parseInt(input.value) || 0;
+                
+                // Validate against maximum returnable quantity
+                if (qty > maxQty) {
+                    alert(`Return quantity cannot exceed ${maxQty} (available for return from this GRN)`);
+                    input.value = maxQty;
+                    qty = maxQty;
+                }
+                
+                if (qty < 1) {
+                    qty = 1;
+                    input.value = 1;
+                }
+                
+                const returnValue = qty * unitPrice;
+                
+                const valueCell = document.querySelector(`.return-value[data-index="${index}"]`);
+                if (valueCell) {
+                    valueCell.textContent = `Rs. ${returnValue.toFixed(2)}`;
+                }
+                
+                calculateTotalReturnValue();
+            }
+
+            function handleRemoveRow(event) {
+                event.target.closest('tr').remove();
+                calculateTotalReturnValue();
+            }
+
+            function calculateTotalReturnValue() {
+                let total = 0;
+                document.querySelectorAll('.return_qty').forEach(input => {
+                    const qty = parseInt(input.value) || 0;
+                    const unitPrice = parseFloat(input.dataset.unitPrice) || 0;
+                    total += qty * unitPrice;
+                });
+                
+                document.getElementById('total_return_value').textContent = total.toFixed(2);
+            }
 
             // Set global entity type for payment modal
             window.currentEntityType = 'purchase_return';
