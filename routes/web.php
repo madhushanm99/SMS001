@@ -356,8 +356,43 @@ Route::middleware([
         Route::get('/INVReturn', function () {
             return redirect()->route('invoice_returns.index');
         })->name('INVReturn');
+        
+        // Service Invoices
+        Route::prefix('service-invoices')->name('service_invoices.')->group(function () {
+            Route::get('/', [App\Http\Controllers\ServiceInvoiceController::class, 'index'])->name('index');
+            Route::get('/create', [App\Http\Controllers\ServiceInvoiceController::class, 'create'])->name('create');
+            
+            // AJAX routes - These MUST come before wildcard routes
+            Route::get('/search/customers', [App\Http\Controllers\ServiceInvoiceController::class, 'customerSearch'])->name('search_customers');
+            Route::get('/search/vehicles', [App\Http\Controllers\ServiceInvoiceController::class, 'vehicleSearch'])->name('search_vehicles');
+            Route::get('/search/jobs', [App\Http\Controllers\ServiceInvoiceController::class, 'jobSearch'])->name('search_jobs');
+            Route::get('/search/items', [App\Http\Controllers\ServiceInvoiceController::class, 'itemSearch'])->name('search_items');
+            
+            // Job item management
+            Route::post('/jobs/add', [App\Http\Controllers\ServiceInvoiceController::class, 'addJobItem'])->name('add_job_item');
+            Route::post('/jobs/remove', [App\Http\Controllers\ServiceInvoiceController::class, 'removeJobItem'])->name('remove_job_item');
+            Route::get('/jobs/session', [App\Http\Controllers\ServiceInvoiceController::class, 'getJobItems'])->name('get_job_items');
+            
+            // Spare item management
+            Route::post('/spares/add', [App\Http\Controllers\ServiceInvoiceController::class, 'addSpareItem'])->name('add_spare_item');
+            Route::post('/spares/remove', [App\Http\Controllers\ServiceInvoiceController::class, 'removeSpareItem'])->name('remove_spare_item');
+            Route::get('/spares/session', [App\Http\Controllers\ServiceInvoiceController::class, 'getSpareItems'])->name('get_spare_items');
+            
+            // Wildcard routes - These MUST come after specific routes
+            Route::post('/', [App\Http\Controllers\ServiceInvoiceController::class, 'store'])->name('store');
+            Route::get('/{serviceInvoice}', [App\Http\Controllers\ServiceInvoiceController::class, 'show'])->name('show');
+            Route::get('/{serviceInvoice}/edit', [App\Http\Controllers\ServiceInvoiceController::class, 'edit'])->name('edit');
+            Route::put('/{serviceInvoice}', [App\Http\Controllers\ServiceInvoiceController::class, 'update'])->name('update');
+            Route::delete('/{serviceInvoice}', [App\Http\Controllers\ServiceInvoiceController::class, 'destroy'])->name('destroy');
+            Route::post('/{serviceInvoice}/finalize', [App\Http\Controllers\ServiceInvoiceController::class, 'finalize'])->name('finalize');
+            Route::get('/{serviceInvoice}/add-payment', [App\Http\Controllers\ServiceInvoiceController::class, 'addPayment'])->name('add_payment');
+            Route::get('/{serviceInvoice}/pdf', [App\Http\Controllers\ServiceInvoiceController::class, 'pdf'])->name('pdf');
+            Route::post('/{serviceInvoice}/email', [App\Http\Controllers\ServiceInvoiceController::class, 'email'])->name('email');
+        });
+        
+        // Redirect old workOrder route to service invoices
         Route::get('/workOrder', function () {
-            return view('Sales/workOrder');
+            return redirect()->route('service_invoices.index');
         })->name('workOrder');
         // Route::get('/customers', function () {
         //     return view('Sales/customers');
