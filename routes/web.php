@@ -380,6 +380,7 @@ Route::middleware([
             
             // Wildcard routes - These MUST come after specific routes
             Route::post('/', [App\Http\Controllers\ServiceInvoiceController::class, 'store'])->name('store');
+            Route::get('/{serviceInvoice}/finalize-options', [App\Http\Controllers\ServiceInvoiceController::class, 'finalizeOptions'])->name('finalize_options');
             Route::get('/{serviceInvoice}', [App\Http\Controllers\ServiceInvoiceController::class, 'show'])->name('show');
             Route::get('/{serviceInvoice}/edit', [App\Http\Controllers\ServiceInvoiceController::class, 'edit'])->name('edit');
             Route::put('/{serviceInvoice}', [App\Http\Controllers\ServiceInvoiceController::class, 'update'])->name('update');

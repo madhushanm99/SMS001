@@ -72,7 +72,10 @@ class ServiceInvoiceController extends Controller
             return back()->with('error', 'Please add at least one job type or spare part.');
         }
 
-        DB::transaction(function () use ($request, $jobItems, $spareItems) {
+        $isFinalize = $request->has('finalize') && $request->finalize == '1';
+        $invoice = null;
+
+        DB::transaction(function () use ($request, $jobItems, $spareItems, $isFinalize, &$invoice) {
             $invoice = ServiceInvoice::create([
                 'invoice_no' => ServiceInvoice::generateInvoiceNo(),
                 'customer_id' => $request->customer_id,
@@ -80,7 +83,7 @@ class ServiceInvoiceController extends Controller
                 'mileage' => $request->mileage,
                 'invoice_date' => now()->toDateString(),
                 'notes' => $request->notes,
-                'status' => 'hold',
+                'status' => $isFinalize ? 'finalized' : 'hold',
                 'created_by' => Auth::user()->name,
             ]);
 
@@ -121,6 +124,12 @@ class ServiceInvoiceController extends Controller
 
         // Clear session data
         session()->forget(['service_invoice_job_items', 'service_invoice_spare_items']);
+
+        if ($isFinalize) {
+            // Redirect to payment and PDF options page
+            return redirect()->route('service_invoices.finalize_options', $invoice)
+                ->with('success', 'Service invoice finalized successfully!');
+        }
 
         return redirect()->route('service_invoices.index')->with('success', 'Service invoice created successfully.');
     }
@@ -247,11 +256,27 @@ class ServiceInvoiceController extends Controller
         return back()->with('success', 'Invoice finalized successfully. You can now add payments.');
     }
 
-    public function addPayment(Request $request, ServiceInvoice $serviceInvoice)
+    public function finalizeOptions(ServiceInvoice $serviceInvoice)
     {
         if ($serviceInvoice->status !== 'finalized') {
-            return back()->with('error', 'Can only add payments to finalized invoices.');
+            return redirect()->route('service_invoices.index')
+                ->with('error', 'Only finalized invoices can access payment and PDF options.');
         }
+
+        $serviceInvoice->load(['customer', 'vehicle', 'items']);
+        return view('service_invoices.finalize_options', compact('serviceInvoice'));
+    }
+
+    public function addPayment(ServiceInvoice $serviceInvoice)
+    {
+        if ($serviceInvoice->status !== 'finalized') {
+            return redirect()->route('service_invoices.index')
+                ->with('error', 'Can only add payments to finalized invoices.');
+        }
+
+        $serviceInvoice->load(['customer', 'paymentTransactions']);
+        return view('service_invoices.add_payment', compact('serviceInvoice'));
+    }
 
         return redirect()->route('payment_transactions.create', [
             'type' => 'service_invoice',
