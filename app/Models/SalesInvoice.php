@@ -94,6 +94,35 @@ class SalesInvoice extends Model
         return 'danger';
     }
 
+    // Return-related methods
+    public function getTotalReturns(): float
+    {
+        return $this->returns()->sum('total_amount');
+    }
+
+    public function getTotalRefunds(): float
+    {
+        return $this->paymentTransactions()
+            ->where('type', 'cash_out')
+            ->where('status', 'completed')
+            ->whereNotNull('invoice_return_id')
+            ->sum('amount');
+    }
+
+    public function getAvailableForReturn(): float
+    {
+        $totalPaid = $this->getTotalPayments();
+        $totalRefunds = $this->getTotalRefunds();
+        return max(0, $totalPaid - $totalRefunds);
+    }
+
+    public function hasUnrefundedReturns(): bool
+    {
+        $totalReturns = $this->getTotalReturns();
+        $totalRefunds = $this->getTotalRefunds();
+        return $totalReturns > $totalRefunds;
+    }
+
     public static function generateInvoiceNo(): string
     {
         $lastInvoice = self::latest('invoice_no')->first();

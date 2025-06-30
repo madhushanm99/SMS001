@@ -102,7 +102,7 @@
                             $unpaidCount = $totalInvoices - $paidCount - $partiallyPaidCount;
                         @endphp
 
-                        <div class="row mb-4">
+                        {{-- <div class="row mb-4">
                             <div class="col-md-3">
                                 <div class="card text-center">
                                     <div class="card-body">
@@ -139,7 +139,7 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        </div> --}}
 
                         <!-- Invoices Table -->
                         <div id="invoices-table">

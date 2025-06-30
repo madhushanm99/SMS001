@@ -108,15 +108,36 @@ class InvoiceReturnController extends Controller
             return redirect()->back()->with('error', 'You do not have permission to access invoice returns.');
         }
 
-        $invoice = SalesInvoice::with(['customer', 'items'])->findOrFail($invoiceId);
+        $invoice = SalesInvoice::with(['customer', 'items', 'paymentTransactions' => function($query) {
+            $query->where('status', 'completed')->where('type', 'cash_in');
+        }, 'returns'])->findOrFail($invoiceId);
         
         if ($invoice->status !== 'finalized') {
             return redirect()->route('invoice_returns.select')
                            ->with('error', 'Only finalized invoices can be returned');
         }
 
+        // Get payment options
+        $paymentMethods = \App\Models\PaymentMethod::active()->get();
+        $bankAccounts = \App\Models\BankAccount::active()->get();
+        $paymentCategories = \App\Models\PaymentCategory::where('type', 'expense')->get();
+
+        // Calculate payment summary
+        $totalPaid = $invoice->getTotalPayments();
+        $totalReturns = $invoice->returns()->sum('total_amount');
+        $availableForReturn = $totalPaid - $totalReturns;
+
         session()->forget($this->sessionKey());
-        return view('invoice_returns.create', compact('invoice'));
+        
+        return view('invoice_returns.create', compact(
+            'invoice', 
+            'paymentMethods', 
+            'bankAccounts', 
+            'paymentCategories',
+            'totalPaid',
+            'totalReturns', 
+            'availableForReturn'
+        ));
     }
 
     public function addReturnItem(Request $request)
@@ -212,6 +233,9 @@ class InvoiceReturnController extends Controller
             'invoice_id' => 'required|exists:sales_invoices,id',
             'reason' => 'required|string',
             'notes' => 'nullable|string',
+            'payment_method_id' => 'required|exists:payment_methods,id',
+            'bank_account_id' => 'nullable|exists:bank_accounts,id',
+            'payment_category_id' => 'required|exists:payment_categories,id',
         ]);
 
         $items = session()->get($this->sessionKey(), []);
@@ -220,6 +244,27 @@ class InvoiceReturnController extends Controller
         }
 
         $invoice = SalesInvoice::with('customer')->findOrFail($request->invoice_id);
+        
+        // Calculate total return amount
+        $totalReturnAmount = collect($items)->sum('line_total');
+        
+        // Validate return amount against paid amount
+        $totalPaidAmount = $invoice->getTotalPayments();
+        $existingReturns = $invoice->returns()->sum('total_amount');
+        $availableForReturn = $totalPaidAmount - $existingReturns;
+        
+        if ($totalReturnAmount > $availableForReturn) {
+            return response()->json([
+                'success' => false, 
+                'message' => sprintf(
+                    'Return amount (Rs. %.2f) cannot exceed available refund amount (Rs. %.2f). Total paid: Rs. %.2f, Previous returns: Rs. %.2f',
+                    $totalReturnAmount,
+                    $availableForReturn,
+                    $totalPaidAmount,
+                    $existingReturns
+                )
+            ]);
+        }
 
         DB::beginTransaction();
         try {
@@ -250,19 +295,48 @@ class InvoiceReturnController extends Controller
                     'return_reason' => $item['return_reason'],
                 ]);
 
-                // Increase stock for returned items
-                Stock::increase($item['item_id'], $item['qty_returned']);
+                            // Increase stock for returned items
+            Stock::increase($item['item_id'], $item['qty_returned']);
+        }
+
+        // Create refund payment transaction
+        $refundTransaction = \App\Models\PaymentTransaction::create([
+            'transaction_no' => \App\Models\PaymentTransaction::generateTransactionNumber(),
+            'type' => 'cash_out',
+            'amount' => $return->total_amount,
+            'transaction_date' => now(),
+            'description' => "Refund for Return #{$return->return_no} (Invoice #{$invoice->invoice_no})",
+            'payment_method_id' => $request->payment_method_id,
+            'bank_account_id' => $request->bank_account_id,
+            'payment_category_id' => $request->payment_category_id,
+            'customer_id' => $invoice->customer_id,
+            'sales_invoice_id' => $invoice->id,
+            'invoice_return_id' => $return->id,
+            'reference_no' => $return->return_no,
+            'status' => 'completed',
+            'created_by' => auth()->user()->name ?? 'System',
+            'approved_by' => auth()->user()->name ?? 'System',
+            'approved_at' => now(),
+        ]);
+
+        // Update bank account balance if specified
+        if ($request->bank_account_id) {
+            $bankAccount = \App\Models\BankAccount::find($request->bank_account_id);
+            if ($bankAccount) {
+                $bankAccount->decrement('current_balance', $return->total_amount);
             }
+        }
 
-            DB::commit();
-            session()->forget($this->sessionKey());
+        DB::commit();
+        session()->forget($this->sessionKey());
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Invoice return processed successfully',
-                'return_id' => $return->id,
-                'redirect_url' => route('invoice_returns.index')
-            ]);
+        return response()->json([
+            'success' => true,
+            'message' => 'Invoice return and refund processed successfully',
+            'return_id' => $return->id,
+            'refund_transaction_id' => $refundTransaction->id,
+            'redirect_url' => route('invoice_returns.index')
+        ]);
 
         } catch (\Exception $e) {
             DB::rollBack();

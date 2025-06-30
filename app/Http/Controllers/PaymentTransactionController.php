@@ -472,11 +472,12 @@ class PaymentTransactionController extends Controller
             'reference_no' => 'nullable|string|max:100',
             'customer_id' => 'nullable|exists:customers,custom_id',
             'supplier_id' => 'nullable|exists:suppliers,Supp_CustomID',
-            'sales_invoice_id' => 'nullable|exists:sales_invoices,id',
-            'purchase_order_id' => 'nullable|exists:po,po_Auto_ID',
-            'status' => 'nullable|in:draft,pending,approved,completed',
-            'notes' => 'nullable|string',
-            'attachments.*' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:2048',
+                    'sales_invoice_id' => 'nullable|exists:sales_invoices,id',
+        'purchase_order_id' => 'nullable|exists:po,po_Auto_ID',
+        'invoice_return_id' => 'nullable|exists:invoice_returns,id',
+        'status' => 'nullable|in:draft,pending,approved,completed',
+        'notes' => 'nullable|string',
+        'attachments.*' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:2048',
         ];
 
         // Add conditional validations

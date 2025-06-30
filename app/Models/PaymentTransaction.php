@@ -24,6 +24,7 @@ class PaymentTransaction extends Model
         'supplier_id',
         'sales_invoice_id',
         'purchase_order_id',
+        'invoice_return_id',
         'status',
         'approved_by',
         'approved_at',
@@ -98,6 +99,11 @@ class PaymentTransaction extends Model
     public function purchaseOrder(): BelongsTo
     {
         return $this->belongsTo(Po::class, 'purchase_order_id', 'po_Auto_ID');
+    }
+
+    public function invoiceReturn(): BelongsTo
+    {
+        return $this->belongsTo(InvoiceReturn::class);
     }
 
     // Scopes

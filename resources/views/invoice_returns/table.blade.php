@@ -6,7 +6,8 @@
                 <th>Invoice No</th>
                 <th>Customer</th>
                 <th>Return Date</th>
-                <th>Amount</th>
+                <th>Return Amount</th>
+                <th>Refund Status</th>
                 <th>Status</th>
                 <th>Processed By</th>
                 <th>Actions</th>
@@ -36,6 +37,21 @@
                     <span class="text-danger fw-bold">-Rs. {{ number_format($return->total_amount, 2) }}</span>
                 </td>
                 <td>
+                    @php
+                        $refundTotal = $return->getTotalRefunds();
+                        $refundStatus = $return->getRefundStatus();
+                        $refundStatusColor = $return->getRefundStatusColor();
+                    @endphp
+                    <div>
+                        <span class="badge bg-{{ $refundStatusColor }} mb-1">
+                            {{ ucwords(str_replace('_', ' ', $refundStatus)) }}
+                        </span>
+                        @if($refundTotal > 0)
+                            <br><small class="text-muted">Rs. {{ number_format($refundTotal, 2) }} refunded</small>
+                        @endif
+                    </div>
+                </td>
+                <td>
                     <span class="badge bg-{{ $return->status_color }}">
                         {{ ucfirst($return->status) }}
                     </span>
@@ -58,7 +74,7 @@
             </tr>
             @empty
             <tr>
-                <td colspan="8" class="text-center text-muted py-4">
+                <td colspan="9" class="text-center text-muted py-4">
                     <i class="bi bi-inbox display-6 d-block mb-2"></i>
                     No invoice returns found.
                     <br>

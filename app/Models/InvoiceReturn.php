@@ -39,6 +39,48 @@ class InvoiceReturn extends Model
         return $this->hasMany(InvoiceReturnItem::class, 'invoice_return_id');
     }
 
+    public function paymentTransactions()
+    {
+        return $this->hasMany(PaymentTransaction::class, 'invoice_return_id');
+    }
+
+    // Payment-related methods
+    public function getTotalRefunds(): float
+    {
+        return $this->paymentTransactions()
+            ->where('type', 'cash_out')
+            ->where('status', 'completed')
+            ->sum('amount');
+    }
+
+    public function isRefundProcessed(): bool
+    {
+        return $this->getTotalRefunds() > 0;
+    }
+
+    public function getRefundStatus(): string
+    {
+        $totalRefunds = $this->getTotalRefunds();
+        
+        if ($totalRefunds >= $this->total_amount) {
+            return 'fully_refunded';
+        } elseif ($totalRefunds > 0) {
+            return 'partially_refunded';
+        } else {
+            return 'not_refunded';
+        }
+    }
+
+    public function getRefundStatusColor(): string
+    {
+        return match($this->getRefundStatus()) {
+            'fully_refunded' => 'success',
+            'partially_refunded' => 'warning',
+            'not_refunded' => 'danger',
+            default => 'secondary'
+        };
+    }
+
     public static function generateReturnNo(): string
     {
         $lastReturn = self::latest('return_no')->first();

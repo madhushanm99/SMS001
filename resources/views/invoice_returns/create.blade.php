@@ -32,6 +32,49 @@
                                     <span class="badge bg-{{ $invoice->status_color }}">{{ ucfirst($invoice->status) }}</span>
                                 </p>
                             </div>
+                        </div>
+                        
+                        <!-- Payment Summary -->
+                        <div class="row mt-3 pt-3 border-top">
+                            <div class="col-md-12">
+                                <h6 class="text-muted mb-2">Payment Information</h6>
+                            </div>
+                            <div class="col-md-3">
+                                <p class="mb-1"><strong>Total Paid:</strong> 
+                                    <span class="text-success">Rs. {{ number_format($totalPaid, 2) }}</span>
+                                </p>
+                            </div>
+                            <div class="col-md-3">
+                                <p class="mb-1"><strong>Previous Returns:</strong> 
+                                    <span class="text-warning">Rs. {{ number_format($totalReturns, 2) }}</span>
+                                </p>
+                            </div>
+                            <div class="col-md-3">
+                                <p class="mb-1"><strong>Available for Return:</strong> 
+                                    <span class="text-info">Rs. {{ number_format($availableForReturn, 2) }}</span>
+                                </p>
+                            </div>
+                            <div class="col-md-3">
+                                @if($availableForReturn <= 0)
+                                    <div class="alert alert-warning py-1 px-2 mb-0">
+                                        <small><i class="bi bi-exclamation-triangle"></i> No amount available for return</small>
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                        
+                        @if($totalPaid > 0)
+                        <div class="row mt-2">
+                            <div class="col-md-12">
+                                <small class="text-muted">
+                                    <strong>Payment History:</strong>
+                                    @foreach($invoice->paymentTransactions as $payment)
+                                        Rs. {{ number_format($payment->amount, 2) }} ({{ $payment->paymentMethod->name ?? 'N/A' }}) on {{ $payment->transaction_date->format('M d, Y') }}{{ !$loop->last ? ', ' : '' }}
+                                    @endforeach
+                                </small>
+                            </div>
+                        </div>
+                        @endif
                             <div class="col-md-2">
                                 <a href="{{ route('invoice_returns.select') }}" class="btn btn-outline-secondary btn-sm">
                                     <i class="bi bi-arrow-left"></i> Change Invoice
@@ -147,14 +190,69 @@
                                 </div>
                             </div>
 
+                            <!-- Payment/Refund Information -->
+                            <div class="row mb-3">
+                                <div class="col-md-12">
+                                    <h6 class="text-primary"><i class="bi bi-credit-card"></i> Refund Payment Details</h6>
+                                    <p class="text-muted small mb-3">Specify how the refund should be processed for the customer.</p>
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label for="payment_method_id" class="form-label">Refund Method *</label>
+                                    <select class="form-select" id="payment_method_id" name="payment_method_id" required>
+                                        <option value="">Select refund method</option>
+                                        @foreach($paymentMethods as $method)
+                                            <option value="{{ $method->id }}">{{ $method->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="bank_account_id" class="form-label">Bank Account</label>
+                                    <select class="form-select" id="bank_account_id" name="bank_account_id">
+                                        <option value="">Select bank account (optional)</option>
+                                        @foreach($bankAccounts as $account)
+                                            <option value="{{ $account->id }}">
+                                                {{ $account->account_name }} ({{ $account->account_number }})
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    <small class="text-muted">Required for bank transfers or checks</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="payment_category_id" class="form-label">Expense Category *</label>
+                                    <select class="form-select" id="payment_category_id" name="payment_category_id" required>
+                                        <option value="">Select category</option>
+                                        @foreach($paymentCategories as $category)
+                                            <option value="{{ $category->id }}">{{ $category->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+
                             <div class="text-center">
-                                <button type="button" id="process-return-btn" class="btn btn-success" disabled>
-                                    <i class="bi bi-check-circle"></i> Process Return
+                                <button type="button" id="process-return-btn" class="btn btn-success" 
+                                        {{ $availableForReturn <= 0 ? 'disabled title="No amount available for return"' : 'disabled' }}>
+                                    <i class="bi bi-check-circle"></i> Process Return & Refund
                                 </button>
                                 <a href="{{ route('invoice_returns.select') }}" class="btn btn-secondary ms-2">
                                     <i class="bi bi-x-circle"></i> Cancel
                                 </a>
                             </div>
+                            
+                            @if($availableForReturn <= 0)
+                            <div class="alert alert-warning mt-3">
+                                <i class="bi bi-exclamation-triangle"></i>
+                                <strong>Cannot Process Return:</strong> 
+                                There is no paid amount available for refund. 
+                                @if($totalPaid == 0)
+                                    This invoice has not been paid yet.
+                                @else
+                                    All paid amounts have already been refunded through previous returns.
+                                @endif
+                            </div>
+                            @endif
                         </form>
                     </div>
                 </div>
@@ -205,8 +303,9 @@
                             qtyInput.val('');
                             reasonInput.val('');
                             
-                            // Enable process button if items exist
-                            $('#process-return-btn').prop('disabled', response.items.length === 0);
+                            // Enable process button if items exist and amount is available
+                            const availableAmount = {{ $availableForReturn }};
+                            $('#process-return-btn').prop('disabled', response.items.length === 0 || availableAmount <= 0);
                         } else {
                             Swal.fire({
                                 icon: 'error',
@@ -235,7 +334,8 @@
                         if (response.success) {
                             updateReturnItemsTable(response.items);
                             updateReturnTotal(response.total);
-                            $('#process-return-btn').prop('disabled', response.items.length === 0);
+                            const availableAmount = {{ $availableForReturn }};
+                            $('#process-return-btn').prop('disabled', response.items.length === 0 || availableAmount <= 0);
                         }
                     }
                 });
@@ -244,6 +344,8 @@
             // Process return
             $('#process-return-btn').click(function() {
                 const reason = $('#reason').val();
+                const paymentMethodId = $('#payment_method_id').val();
+                const paymentCategoryId = $('#payment_category_id').val();
 
                 if (!reason) {
                     Swal.fire({
@@ -254,14 +356,45 @@
                     return;
                 }
 
+                if (!paymentMethodId) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Refund Method Required',
+                        text: 'Please select a refund payment method'
+                    });
+                    return;
+                }
+
+                if (!paymentCategoryId) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Payment Category Required',
+                        text: 'Please select a payment category for the refund'
+                    });
+                    return;
+                }
+
+                // Check if return amount exceeds available amount
+                const returnTotal = parseFloat($('#return-total').text().replace(/,/g, ''));
+                const availableAmount = {{ $availableForReturn }};
+                
+                if (returnTotal > availableAmount) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Return Amount Exceeds Available',
+                        text: `Return amount (Rs. ${returnTotal.toFixed(2)}) cannot exceed available refund amount (Rs. ${availableAmount.toFixed(2)})`
+                    });
+                    return;
+                }
+
                 Swal.fire({
-                    title: 'Process Return?',
-                    text: 'This will process the return and update stock levels. This action cannot be undone.',
+                    title: 'Process Return & Refund?',
+                    text: 'This will process the return, update stock levels, and create a refund transaction. This action cannot be undone.',
                     icon: 'question',
                     showCancelButton: true,
                     confirmButtonColor: '#28a745',
                     cancelButtonColor: '#6c757d',
-                    confirmButtonText: 'Yes, Process Return'
+                    confirmButtonText: 'Yes, Process Return & Refund'
                 }).then((result) => {
                     if (result.isConfirmed) {
                         submitReturn();
@@ -279,7 +412,10 @@
                     data: {
                         invoice_id: $('input[name="invoice_id"]').val(),
                         reason: $('#reason').val(),
-                        notes: $('#notes').val()
+                        notes: $('#notes').val(),
+                        payment_method_id: $('#payment_method_id').val(),
+                        bank_account_id: $('#bank_account_id').val(),
+                        payment_category_id: $('#payment_category_id').val()
                     },
                     success: function(response) {
                         if (response.success) {
@@ -342,7 +478,8 @@
                 if (response.success && response.items.length > 0) {
                     updateReturnItemsTable(response.items);
                     updateReturnTotal(response.total);
-                    $('#process-return-btn').prop('disabled', false);
+                    const availableAmount = {{ $availableForReturn }};
+                    $('#process-return-btn').prop('disabled', response.items.length === 0 || availableAmount <= 0);
                 }
             });
         });

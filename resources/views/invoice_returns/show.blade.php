@@ -77,6 +77,83 @@
                                 </div>
                                 @endif
 
+                                <!-- Refund Information -->
+                                <div class="mb-4">
+                                    <h6>Refund Information</h6>
+                                    @php
+                                        $refundTransactions = $return->paymentTransactions()->with(['paymentMethod', 'bankAccount'])->get();
+                                        $totalRefunds = $return->getTotalRefunds();
+                                        $refundStatus = $return->getRefundStatus();
+                                        $refundStatusColor = $return->getRefundStatusColor();
+                                    @endphp
+                                    
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <p class="mb-1"><strong>Refund Status:</strong> 
+                                                <span class="badge bg-{{ $refundStatusColor }}">
+                                                    {{ ucwords(str_replace('_', ' ', $refundStatus)) }}
+                                                </span>
+                                            </p>
+                                            <p class="mb-1"><strong>Total Refunded:</strong> 
+                                                <span class="text-success fw-bold">Rs. {{ number_format($totalRefunds, 2) }}</span>
+                                            </p>
+                                        </div>
+                                        <div class="col-md-6">
+                                            @if($totalRefunds < $return->total_amount)
+                                                <p class="mb-1"><strong>Pending Refund:</strong> 
+                                                    <span class="text-warning fw-bold">Rs. {{ number_format($return->total_amount - $totalRefunds, 2) }}</span>
+                                                </p>
+                                            @endif
+                                        </div>
+                                    </div>
+
+                                    @if($refundTransactions->count() > 0)
+                                    <div class="table-responsive mt-3">
+                                        <table class="table table-sm table-bordered">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Transaction No</th>
+                                                    <th>Date</th>
+                                                    <th>Method</th>
+                                                    <th>Bank Account</th>
+                                                    <th>Amount</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach($refundTransactions as $transaction)
+                                                <tr>
+                                                    <td>
+                                                        <a href="{{ route('payment-transactions.show', $transaction->id) }}" 
+                                                           class="text-decoration-none" target="_blank">
+                                                            {{ $transaction->transaction_no }}
+                                                            <i class="bi bi-box-arrow-up-right text-muted small"></i>
+                                                        </a>
+                                                    </td>
+                                                    <td>{{ $transaction->transaction_date->format('Y-m-d') }}</td>
+                                                    <td>{{ $transaction->paymentMethod->name ?? 'N/A' }}</td>
+                                                    <td>{{ $transaction->bankAccount->account_name ?? 'N/A' }}</td>
+                                                    <td class="text-end">
+                                                        <span class="text-danger">Rs. {{ number_format($transaction->amount, 2) }}</span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-{{ $transaction->status === 'completed' ? 'success' : 'warning' }}">
+                                                            {{ ucfirst($transaction->status) }}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    @else
+                                    <div class="alert alert-warning">
+                                        <i class="bi bi-exclamation-triangle"></i>
+                                        No refund transactions found for this return.
+                                    </div>
+                                    @endif
+                                </div>
+
                                 <!-- Return Items -->
                                 <h6>Returned Items</h6>
                                 <div class="table-responsive">
