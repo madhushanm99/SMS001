@@ -44,10 +44,8 @@
                                 Balance: Rs. {{ number_format($outstandingAmount, 2) }}
                             </small>
                         @endif
-                        {{-- Debug info (remove in production) --}}
-                        <small class="text-muted d-block" style="font-size: 0.7rem;">
-                            Debug: Total={{ $invoice->grand_total }}, Paid={{ $totalPaid }}, Outstanding={{ $outstandingAmount }}
-                        </small>
+                        
+                        
                     </td>
                     <td>
                         <span class="badge bg-{{ $paymentStatusColor }}">

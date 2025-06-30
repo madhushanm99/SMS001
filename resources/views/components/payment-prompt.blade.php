@@ -374,13 +374,6 @@ try {
             const outstandingAmount = parseFloat($('#modal-outstanding-amount').text().replace(/,/g, '')) || 0;
             const totalAmount = parseFloat($('#modal-total-amount').text().replace(/,/g, '')) || 0;
             
-            // Debug logging
-            console.log('Payment calculations:', {
-                paymentAmount,
-                outstandingAmount,
-                totalAmount,
-                isAlreadyFullyPaid: outstandingAmount <= 0
-            });
             
             // Check if invoice is already fully paid from the start
             const isAlreadyFullyPaid = outstandingAmount <= 0;
@@ -422,7 +415,7 @@ try {
                 return; // Exit early for fully paid invoices
             }
             
-            console.log('💰 Invoice needs payment - showing payment form');
+            
             
             // Normal payment interface for unpaid/partially paid invoices
             $('#paymentForm').show();
@@ -746,17 +739,16 @@ try {
             $('#paymentPromptModal').on('shown.bs.modal', function() {
                 // Check if invoice is fully paid after modal is shown
                 const outstandingAmount = parseFloat($('#modal-outstanding-amount').text().replace(/,/g, '')) || 0;
-                console.log('Modal shown - checking outstanding amount:', outstandingAmount);
-                
+               
                 if (outstandingAmount <= 0) {
-                    console.log('🎯 Modal shown event - Invoice is fully paid');
+                    
                     // Force show completion interface
                     $('#paymentForm').hide().css('display', 'none');
                     $('#fullyPaidMessage').show().css('display', 'block');
                     $('#paymentButtons').hide().css('display', 'none');
                     $('#fullyPaidButtons').show().css('display', 'block');
                 } else {
-                    console.log('🎯 Modal shown event - Invoice needs payment');
+                   
                     // Force show payment interface
                     $('#paymentForm').show().css('display', 'block');
                     $('#fullyPaidMessage').hide().css('display', 'none');
@@ -829,7 +821,7 @@ try {
                 // Reset alert message
                 $('.alert-success').removeClass('alert-success').addClass('alert-info');
                 
-                console.log('🔄 Modal closed - reset to default state');
+                
             });
         });
     }
@@ -875,14 +867,14 @@ try {
                 // Check immediately if fully paid and handle accordingly
                 // Ensure outstanding amount is properly converted to number
                 const outstandingAmount = parseFloat(data.outstanding_amount) || parseFloat(data.total_amount) || 0;
-                console.log('Immediate check - Outstanding amount:', outstandingAmount, 'Type:', typeof outstandingAmount, 'Original data:', data.outstanding_amount);
+                
                 
                 if (outstandingAmount <= 0) {
-                    console.log('🚀 Immediately detected fully paid invoice');
+                    
                     // For fully paid invoices, set amount to 0 to prevent confusion
                     $('#payment_amount').attr('max', data.total_amount || 0).val(0);
                 } else {
-                    console.log('💰 Invoice has outstanding amount:', outstandingAmount);
+                    
                     $('#payment_amount').attr('max', outstandingAmount).val(outstandingAmount);
                 }
                 
@@ -893,7 +885,7 @@ try {
                 // Add a small delay to ensure calculations run after modal is shown
                 setTimeout(function() {
                     window.updatePaymentCalculations();
-                    console.log('🔄 Running delayed calculations to ensure proper display');
+                    
                 }, 100);
             });
         }
@@ -907,10 +899,7 @@ try {
     // Mark that payment prompt is ready
     window.paymentPromptReady = true;
     
-    // Debug log (can be removed in production)
-    if (typeof window.showPaymentPrompt === 'function') {
-        console.log('✅ Payment prompt component loaded successfully');
-    }
+    
 } catch (error) {
     console.error('Error marking payment prompt as ready:', error);
 }

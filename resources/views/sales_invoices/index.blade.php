@@ -263,42 +263,16 @@
 
         // Handle payment button click with fallback
         window.handlePaymentClick = function(button, entityId, entityNo, partyName, totalAmount, outstandingAmount, type) {
-            // Debug: Log the values being passed
-            console.log('🔍 handlePaymentClick called with:', {
-                entityId,
-                entityNo,
-                partyName,
-                totalAmount,
-                outstandingAmount,
-                type,
-                'outstandingAmount type': typeof outstandingAmount,
-                'outstandingAmount <= 0': outstandingAmount <= 0
-            });
             
-            // Debug: Show all data attributes for comparison
-            const btn = $(button);
-            console.log('🔍 Button data attributes:', {
-                'data-invoice-id': btn.data('invoice-id'),
-                'data-invoice-no': btn.data('invoice-no'),
-                'data-customer-name': btn.data('customer-name'),
-                'data-total-amount': btn.data('total-amount'),
-                'data-outstanding-amount': btn.data('outstanding-amount'),
-                'data-payment-status': btn.data('payment-status'),
-                'data-total-paid': btn.data('total-paid'),
-                'outstanding from params': outstandingAmount,
-                'outstanding from data attr': btn.data('outstanding-amount')
-            });
+            
+            
             
             // Try the main function first
             try {
                 window.showPaymentPromptFromIndex(entityId, entityNo, partyName, totalAmount, outstandingAmount, type);
             } catch (error) {
                 console.error('Error calling payment prompt:', error);
-                // Use data attributes as fallback
-                console.log('🔍 Fallback - using data attributes:', {
-                    'data-outstanding-amount': btn.data('outstanding-amount'),
-                    'data-total-amount': btn.data('total-amount')
-                });
+                
                 window.showPaymentPromptFromIndex(
                     btn.data('invoice-id'), 
                     btn.data('invoice-no'), 
@@ -312,17 +286,6 @@
 
         // Payment prompt functionality for index page
         window.showPaymentPromptFromIndex = function(entityId, entityNo, partyName, totalAmount, outstandingAmount, type) {
-            // Debug: Log the values being passed to payment prompt
-            console.log('🔍 showPaymentPromptFromIndex called with:', {
-                entityId,
-                entityNo,
-                partyName,
-                totalAmount,
-                outstandingAmount,
-                type,
-                'outstandingAmount type': typeof outstandingAmount,
-                'outstandingAmount <= 0': outstandingAmount <= 0
-            });
             
             // Set up the payment prompt data
             const data = {
@@ -333,10 +296,7 @@
                 outstanding_amount: parseFloat(outstandingAmount) || 0,
                 type: type
             };
-            
-            console.log('🔍 Data object being passed to showPaymentPrompt:', data);
-            console.log('🔍 Outstanding amount after parseFloat:', data.outstanding_amount, 'Is <= 0?', data.outstanding_amount <= 0);
-            
+        
             // Set global variables for the payment prompt
             window.currentEntityType = type;
             window.currentEntityId = entityId;
@@ -420,49 +380,6 @@
 
         });
 
-        // Test function for debugging (can be removed in production)
-        window.testFullyPaidInvoice = function() {
-            console.log('🧪 Testing fully paid invoice interface...');
-            const testData = {
-                entity_id: '999',
-                entity_no: 'INV000999',
-                party_name: 'Test Customer',
-                total_amount: 1000,
-                outstanding_amount: 0, // Fully paid
-                type: 'invoice'
-            };
-            console.log('🧪 Test data:', testData);
-            window.showPaymentPrompt(testData);
-        };
-        
-        window.testPartiallyPaidInvoice = function() {
-            console.log('🧪 Testing partially paid invoice interface...');
-            const testData = {
-                entity_id: '998',
-                entity_no: 'INV000998',
-                party_name: 'Test Customer',
-                total_amount: 1000,
-                outstanding_amount: 500, // Partially paid
-                type: 'invoice'
-            };
-            console.log('🧪 Test data:', testData);
-            window.showPaymentPrompt(testData);
-        };
-        
-        // Manual override for testing specific invoices
-        window.testInvoiceWithData = function(totalAmount, outstandingAmount) {
-            console.log(`🧪 Testing invoice with total: ${totalAmount}, outstanding: ${outstandingAmount}`);
-            const testData = {
-                entity_id: '999',
-                entity_no: 'INV000999',
-                party_name: 'Test Customer',
-                total_amount: parseFloat(totalAmount),
-                outstanding_amount: parseFloat(outstandingAmount),
-                type: 'invoice'
-            };
-            console.log('🧪 Test data:', testData);
-            window.showPaymentPrompt(testData);
-        };
     </script>
     @endpush
 </x-layout> 
