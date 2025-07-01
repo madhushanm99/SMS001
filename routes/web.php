@@ -363,10 +363,10 @@ Route::middleware([
             Route::get('/create', [App\Http\Controllers\ServiceInvoiceController::class, 'create'])->name('create');
             
             // AJAX routes - These MUST come before wildcard routes
-            Route::get('/search/customers', [App\Http\Controllers\ServiceInvoiceController::class, 'customerSearch'])->name('search_customers');
-            Route::get('/search/vehicles', [App\Http\Controllers\ServiceInvoiceController::class, 'vehicleSearch'])->name('search_vehicles');
-            Route::get('/search/jobs', [App\Http\Controllers\ServiceInvoiceController::class, 'jobSearch'])->name('search_jobs');
-            Route::get('/search/items', [App\Http\Controllers\ServiceInvoiceController::class, 'itemSearch'])->name('search_items');
+            Route::get('/search/customers', [App\Http\Controllers\ServiceInvoiceController::class, 'customerSearch'])->name('customer_search');
+            Route::get('/search/vehicles', [App\Http\Controllers\ServiceInvoiceController::class, 'vehicleSearch'])->name('vehicle_search');
+            Route::get('/search/jobs', [App\Http\Controllers\ServiceInvoiceController::class, 'jobSearch'])->name('job_search');
+            Route::get('/search/items', [App\Http\Controllers\ServiceInvoiceController::class, 'itemSearch'])->name('item_search');
             
             // Job item management
             Route::post('/jobs/add', [App\Http\Controllers\ServiceInvoiceController::class, 'addJobItem'])->name('add_job_item');

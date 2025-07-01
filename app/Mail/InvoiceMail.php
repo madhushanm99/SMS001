@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Models\SalesInvoice;
+use App\Models\ServiceInvoice;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -17,13 +18,17 @@ class InvoiceMail extends Mailable
     use Queueable, SerializesModels;
 
     public $invoice;
+    public $pdfContent;
+    public $customMessage;
 
     /**
      * Create a new message instance.
      */
-    public function __construct(SalesInvoice $invoice)
+    public function __construct($invoice, $pdfContent = null, $customMessage = null)
     {
         $this->invoice = $invoice;
+        $this->pdfContent = $pdfContent;
+        $this->customMessage = $customMessage;
     }
 
     /**
@@ -31,8 +36,12 @@ class InvoiceMail extends Mailable
      */
     public function envelope(): Envelope
     {
+        $subject = $this->invoice instanceof ServiceInvoice 
+            ? "Service Invoice #{$this->invoice->invoice_no} - " . config('app.name')
+            : "Invoice #{$this->invoice->invoice_no} - " . config('app.name');
+            
         return new Envelope(
-            subject: "Invoice #{$this->invoice->invoice_no} - " . config('app.name'),
+            subject: $subject,
         );
     }
 
@@ -45,7 +54,9 @@ class InvoiceMail extends Mailable
             view: 'emails.invoice',
             with: [
                 'invoice' => $this->invoice,
-                'customer' => $this->invoice->customer
+                'customer' => $this->invoice->customer,
+                'customMessage' => $this->customMessage,
+                'isServiceInvoice' => $this->invoice instanceof ServiceInvoice
             ]
         );
     }
@@ -57,8 +68,22 @@ class InvoiceMail extends Mailable
      */
     public function attachments(): array
     {
-        // Generate PDF and attach it
-        $pdf = Pdf::loadView('sales_invoices.pdf', ['invoice' => $this->invoice]);
+        if ($this->pdfContent) {
+            // Use provided PDF content
+            return [
+                Attachment::fromData(
+                    fn () => $this->pdfContent,
+                    "invoice-{$this->invoice->invoice_no}.pdf"
+                )->withMime('application/pdf')
+            ];
+        }
+        
+        // Generate PDF based on invoice type
+        if ($this->invoice instanceof ServiceInvoice) {
+            $pdf = Pdf::loadView('service_invoices.pdf', ['serviceInvoice' => $this->invoice]);
+        } else {
+            $pdf = Pdf::loadView('sales_invoices.pdf', ['invoice' => $this->invoice]);
+        }
         
         return [
             Attachment::fromData(

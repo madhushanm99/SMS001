@@ -53,9 +53,10 @@
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label for="vehicle_select" class="form-label">Vehicle</label>
-                                    <select name="vehicle_no" id="vehicle_select" class="form-control">
+                                    <select name="vehicle_no" id="vehicle_select" class="form-control" disabled>
                                         <option value="">Select customer first...</option>
                                     </select>
+                                    <div class="form-text">Select a customer first to see available vehicles</div>
                                 </div>
                             </div>
                         </div>
@@ -192,58 +193,111 @@
         let selectedCustomerId = '';
         let jobItems = [];
         let spareItems = [];
-        let vehicleSelect2 = null;
 
         $(document).ready(function() {
             initializeCustomerSearch();
             initializeJobSearch();
             initializeSpareSearch();
+            
+            // Initialize vehicle select as disabled
+            clearVehicles();
         });
 
         function initializeCustomerSearch() {
             $('#customer_select').select2({
                 placeholder: 'Search customer...',
+                minimumInputLength: 2,
                 ajax: {
-                    url: '{{ route('service_invoices.search_customers') }}',
+                    url: '{{ route('service_invoices.customer_search') }}',
                     dataType: 'json',
                     delay: 250,
-                    data: params => ({ term: params.term }),
-                    processResults: data => ({ results: data }),
+                    data: function(params) {
+                        return {
+                            term: params.term
+                        };
+                    },
+                    processResults: function(data) {
+                        return {
+                            results: data
+                        };
+                    },
+                    cache: true
                 }
             }).on('select2:select', function(e) {
                 selectedCustomerId = e.params.data.id;
+                console.log('Customer selected:', selectedCustomerId);
                 loadVehicles(selectedCustomerId);
+            }).on('select2:clear', function(e) {
+                selectedCustomerId = '';
+                clearVehicles();
             });
         }
 
         function loadVehicles(customerId) {
-            // Destroy existing Select2 instance if it exists
-            if (vehicleSelect2) {
-                vehicleSelect2.destroy();
+            console.log('Loading vehicles for customer:', customerId);
+            
+            try {
+                // Properly destroy existing Select2 instance if it exists
+                if ($('#vehicle_select').hasClass('select2-hidden-accessible')) {
+                    $('#vehicle_select').select2('destroy');
+                }
+            } catch (e) {
+                console.warn('Error destroying Select2:', e);
             }
             
-            // Clear the select element
+            // Clear and reset the select element
             $('#vehicle_select').empty().append('<option value="">Select vehicle...</option>');
             
-            // Initialize new Select2 instance
-            vehicleSelect2 = $('#vehicle_select').select2({
+            if (!customerId) {
+                $('#vehicle_select').prop('disabled', true);
+                return;
+            }
+            
+            // Initialize new Select2 instance with customer filtering
+            $('#vehicle_select').select2({
                 placeholder: 'Select vehicle...',
+                allowClear: true,
                 ajax: {
-                    url: '{{ route('service_invoices.search_vehicles') }}',
-                    data: params => ({
-                        q: params.term,
-                        customer_id: customerId
-                    }),
-                    processResults: data => ({ results: data }),
+                    url: '{{ route('service_invoices.vehicle_search') }}',
+                    dataType: 'json',
+                    delay: 250,
+                    data: function(params) {
+                        return {
+                            q: params.term || '',
+                            customer_id: customerId
+                        };
+                    },
+                    processResults: function(data) {
+                        console.log('Vehicle search results:', data);
+                        return {
+                            results: data
+                        };
+                    },
+                    cache: true
                 }
             });
+            
+            $('#vehicle_select').prop('disabled', false);
+        }
+
+        function clearVehicles() {
+            try {
+                // Properly destroy existing Select2 instance if it exists
+                if ($('#vehicle_select').hasClass('select2-hidden-accessible')) {
+                    $('#vehicle_select').select2('destroy');
+                }
+            } catch (e) {
+                console.warn('Error destroying Select2:', e);
+            }
+            $('#vehicle_select').empty().append('<option value="">Select customer first...</option>');
+            $('#vehicle_select').prop('disabled', true);
         }
 
         function initializeJobSearch() {
             $('#job_selector').select2({
                 placeholder: 'Search job types...',
                 ajax: {
-                    url: '{{ route('service_invoices.search_jobs') }}',
+                    url: '{{ route('service_invoices.job_search') }}',
                     dataType: 'json',
                     delay: 250,
                     data: params => ({ term: params.term }),
@@ -258,7 +312,7 @@
             $('#spare_selector').select2({
                 placeholder: 'Search spare parts...',
                 ajax: {
-                    url: '{{ route('service_invoices.search_items') }}',
+                    url: '{{ route('service_invoices.item_search') }}',
                     dataType: 'json',
                     delay: 250,
                     data: params => ({ term: params.term }),

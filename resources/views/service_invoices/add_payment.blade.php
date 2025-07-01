@@ -53,7 +53,7 @@
                         </h5>
                     </div>
                     <div class="card-body">
-                        <form method="POST" action="{{ route('payment_transactions.store') }}">
+                        <form method="POST" action="{{ route('payment-transactions.store') }}">
                             @csrf
                             <input type="hidden" name="reference_type" value="service_invoice">
                             <input type="hidden" name="reference_id" value="{{ $serviceInvoice->id }}">

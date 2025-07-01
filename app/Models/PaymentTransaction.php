@@ -27,6 +27,7 @@ class PaymentTransaction extends Model
         'grn_id',
         'purchase_return_id',
         'invoice_return_id',
+        'service_invoice_id',
         'status',
         'approved_by',
         'approved_at',
@@ -116,6 +117,11 @@ class PaymentTransaction extends Model
     public function invoiceReturn(): BelongsTo
     {
         return $this->belongsTo(InvoiceReturn::class);
+    }
+
+    public function serviceInvoice(): BelongsTo
+    {
+        return $this->belongsTo(ServiceInvoice::class);
     }
 
     // Scopes

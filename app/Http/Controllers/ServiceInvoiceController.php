@@ -278,12 +278,6 @@ class ServiceInvoiceController extends Controller
         return view('service_invoices.add_payment', compact('serviceInvoice'));
     }
 
-        return redirect()->route('payment_transactions.create', [
-            'type' => 'service_invoice',
-            'reference_id' => $serviceInvoice->id
-        ]);
-    }
-
     public function destroy(ServiceInvoice $serviceInvoice)
     {
         if ($serviceInvoice->status === 'finalized') {
@@ -348,6 +342,12 @@ class ServiceInvoiceController extends Controller
         $customerId = $request->get('customer_id');
         $term = $request->get('q', '');
 
+        // Log the request for debugging
+        \Log::info('Vehicle search request', [
+            'customer_id' => $customerId,
+            'search_term' => $term
+        ]);
+
         $query = Vehicle::where('status', true);
 
         if ($customerId) {
@@ -355,6 +355,14 @@ class ServiceInvoiceController extends Controller
             $customer = Customer::where('custom_id', $customerId)->first();
             if ($customer) {
                 $query->where('customer_id', $customer->id);
+                \Log::info('Filtering vehicles for customer', [
+                    'customer_custom_id' => $customerId,
+                    'customer_db_id' => $customer->id
+                ]);
+            } else {
+                \Log::warning('Customer not found', ['custom_id' => $customerId]);
+                // Return empty array if customer not found
+                return response()->json([]);
             }
         }
 
@@ -368,8 +376,14 @@ class ServiceInvoiceController extends Controller
                 return [
                     'id' => $vehicle->vehicle_no,
                     'text' => $vehicle->vehicle_no,
+                    'customer_name' => $vehicle->customer->name ?? 'Unknown'
                 ];
             });
+
+        \Log::info('Vehicle search results', [
+            'count' => $vehicles->count(),
+            'vehicles' => $vehicles->toArray()
+        ]);
 
         return response()->json($vehicles);
     }
