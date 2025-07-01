@@ -9,6 +9,8 @@ use App\Models\Vehicle;
 use App\Models\JobTypes;
 use App\Models\Products;
 use App\Models\PaymentTransaction;
+use App\Models\PaymentMethod;
+use App\Models\PaymentCategory;
 use App\Mail\InvoiceMail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -289,6 +291,82 @@ class ServiceInvoiceController extends Controller
         return view('service_invoices.add_payment', compact('serviceInvoice'));
     }
 
+    /**
+     * Store a payment for the service invoice.
+     */
+    public function storePayment(Request $request, ServiceInvoice $serviceInvoice)
+    {
+        if ($serviceInvoice->status !== 'finalized') {
+            return redirect()->route('service_invoices.index')
+                ->with('error', 'Can only add payments to finalized invoices.');
+        }
+
+        $request->validate([
+            'amount' => 'required|numeric|min:0.01|max:' . $serviceInvoice->getOutstandingAmount(),
+            'payment_method_id' => 'required|string',
+            'payment_date' => 'required|date',
+            'reference_number' => 'nullable|string|max:255',
+            'notes' => 'nullable|string|max:1000',
+        ]);
+
+        try {
+            DB::transaction(function () use ($request, $serviceInvoice) {
+                // Get or create the payment method
+                $paymentMethodName = ucfirst($request->payment_method_id);
+                $paymentMethod = PaymentMethod::firstOrCreate(
+                    ['code' => $request->payment_method_id],
+                    [
+                        'name' => str_replace('_', ' ', ucfirst($request->payment_method_id)),
+                        'code' => $request->payment_method_id,
+                        'description' => 'Auto-created payment method',
+                        'is_active' => true,
+                        'requires_reference' => in_array($request->payment_method_id, ['cheque', 'bank_transfer']),
+                    ]
+                );
+                
+                // Get or create a payment category for service invoice payments
+                $paymentCategory = PaymentCategory::firstOrCreate(
+                    ['code' => 'service_income'],
+                    [
+                        'name' => 'Service Income',
+                        'code' => 'service_income',
+                        'type' => 'income',
+                        'description' => 'Income from service invoices',
+                        'is_active' => true,
+                        'sort_order' => 1,
+                    ]
+                );
+
+                PaymentTransaction::create([
+                    'type' => 'cash_in',
+                    'amount' => $request->amount,
+                    'transaction_date' => $request->payment_date,
+                    'transaction_time' => now(),
+                    'description' => 'Payment for service invoice #' . $serviceInvoice->invoice_no,
+                    'reference_no' => $request->reference_number,
+                    'payment_method_id' => $paymentMethod->id, // Use the ID instead of the string value
+                    'payment_category_id' => $paymentCategory->id, // Add payment category ID
+                    'customer_id' => $serviceInvoice->customer_id,
+                    'service_invoice_id' => $serviceInvoice->id,
+                    'status' => 'completed',
+                    'created_by' => Auth::user()->name ?? Auth::user()->email,
+                    'notes' => $request->notes,
+                ]);
+
+                // Do not update the invoice status, as it only supports 'hold' and 'finalized'
+                // The payment status can be determined using the getPaymentStatus() method
+                // We keep the status as 'finalized'
+            });
+
+            return redirect()->route('service_invoices.show', $serviceInvoice)
+                ->with('success', 'Payment recorded successfully!');
+        } catch (\Exception $e) {
+            return redirect()->back()
+                ->with('error', 'Error recording payment: ' . $e->getMessage())
+                ->withInput();
+        }
+    }
+
     public function destroy(ServiceInvoice $serviceInvoice)
     {
         if ($serviceInvoice->status === 'finalized') {
@@ -304,8 +382,8 @@ class ServiceInvoiceController extends Controller
     {
         $serviceInvoice->load(['customer', 'vehicle', 'items']);
         
-        $pdf = Pdf::loadView('service_invoices.pdf', compact('serviceInvoice'));
-        return $pdf->download("service_invoice_{$serviceInvoice->invoice_no}.pdf");
+        $pdf = Pdf::loadView('service_invoices.pdf', ['serviceInvoice' => $serviceInvoice,]);
+        return $pdf->stream("service_invoice_{$serviceInvoice->invoice_no}.pdf");
     }
 
     // Email Invoice

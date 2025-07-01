@@ -17,6 +17,7 @@ use App\Http\Controllers\PaymentMethodController;
 use App\Http\Controllers\BankAccountController;
 use App\Http\Controllers\PaymentCategoryController;
 use App\Http\Controllers\PaymentReportController;
+use App\Http\Controllers\CustomerAuthController;
 
 
 
@@ -387,6 +388,7 @@ Route::middleware([
             Route::delete('/{serviceInvoice}', [App\Http\Controllers\ServiceInvoiceController::class, 'destroy'])->name('destroy');
             Route::post('/{serviceInvoice}/finalize', [App\Http\Controllers\ServiceInvoiceController::class, 'finalize'])->name('finalize');
             Route::get('/{serviceInvoice}/add-payment', [App\Http\Controllers\ServiceInvoiceController::class, 'addPayment'])->name('add_payment');
+            Route::post('/{serviceInvoice}/store-payment', [App\Http\Controllers\ServiceInvoiceController::class, 'storePayment'])->name('store_payment');
             Route::get('/{serviceInvoice}/pdf', [App\Http\Controllers\ServiceInvoiceController::class, 'pdf'])->name('pdf');
             Route::post('/{serviceInvoice}/email', [App\Http\Controllers\ServiceInvoiceController::class, 'email'])->name('email');
         });
@@ -464,4 +466,21 @@ Route::middleware([
     })->name('403');
 
     //Route::get('/suppliers', [SupplierController::class, 'index'])->name('suppliers');
+});
+
+// Customer Authentication Routes
+Route::prefix('customer')->name('customer.')->group(function () {
+    // Guest routes
+    Route::middleware('guest.customer')->group(function () {
+        Route::get('/login', [CustomerAuthController::class, 'showLoginForm'])->name('login');
+        Route::post('/login', [CustomerAuthController::class, 'login']);
+        Route::get('/register', [CustomerAuthController::class, 'showRegistrationForm'])->name('register');
+        Route::post('/register', [CustomerAuthController::class, 'register']);
+    });
+    
+    // Protected routes
+    Route::middleware('auth.customer')->group(function () {
+        Route::get('/dashboard', [CustomerAuthController::class, 'dashboard'])->name('dashboard');
+        Route::post('/logout', [CustomerAuthController::class, 'logout'])->name('logout');
+    });
 });

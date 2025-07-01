@@ -77,7 +77,7 @@
                                     @endif
                                     
                                     @if($invoice->status === 'finalized')
-                                        <a href="{{ route('service_invoices.pdf', $invoice) }}" class="btn btn-outline-danger" title="Download PDF">
+                                        <a href="{{ route('service_invoices.pdf', $invoice) }}" target="_blank" class="btn btn-outline-danger" title="Download PDF">
                                             <i class="bi bi-file-pdf"></i>
                                         </a>
                                         

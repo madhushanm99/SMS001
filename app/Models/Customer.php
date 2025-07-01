@@ -78,6 +78,6 @@ public static function generateCustomID(): string
 
 public function login()
 {
-    //return $this->belongsTo(CustomerLogin::class, 'user_id');
+    return $this->hasOne(CustomerLogin::class, 'customer_custom_id', 'custom_id');
 }
 }
