@@ -134,7 +134,7 @@
 
                             <div class="d-flex justify-content-between">
                                 <div>
-                                    <a href="{{ route('service_invoices.finalize_options', $serviceInvoice) }}" class="btn btn-secondary">
+                                    <a href="{{ url()->previous() }}" class="btn btn-secondary">
                                         <i class="bi bi-arrow-left me-2"></i>Back
                                     </a>
                                 </div>
