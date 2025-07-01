@@ -1,7 +1,7 @@
 #Customer
 
-- able to login
-- able to register
+- able to login done
+- able to register done
 - able to register new vehicle
 - able to see his service records
 - able to make appoinment to Service
