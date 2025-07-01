@@ -2,21 +2,22 @@
     <div class="sidebar-sticky pt-3">
         <ul class="nav flex-column">
             <li class="nav-item">
-                <a class="nav-link {{ request()->routeIs('customer.dashboard') ? 'active' : '' }}" href="{{ route('customer.dashboard') }}">
+                <a class="nav-link {{ request()->routeIs('customer.dashboard') ? 'active' : '' }}"
+                    href="{{ route('customer.dashboard') }}">
                     <i class="bi bi-speedometer2"></i>
                     Dashboard
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {{ request()->routeIs('customer.invoices*') ? 'active' : '' }}" href="#">
-                    <i class="bi bi-file-text"></i>
-                    My Invoices
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link {{ request()->routeIs('customer.vehicles*') ? 'active' : '' }}" href="#">
                     <i class="bi bi-car-front"></i>
                     My Vehicles
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ request()->routeIs('customer.invoices*') ? 'active' : '' }}" href="#">
+                    <i class="bi bi-file-text"></i>
+                    My Invoices
                 </a>
             </li>
             <li class="nav-item">
@@ -33,4 +34,4 @@
             </li>
         </ul>
     </div>
-</nav> 
+</nav>
