@@ -54,29 +54,17 @@
                                         <div class="col-md-6">
                                             <div class="mb-3">
                                                 <label for="edit_customer_search" class="form-label">Customer <span class="text-danger">*</span></label>
-                                                <select class="form-select" id="edit_customer_search" name="customer_id" required>
-                                                    @if($serviceInvoice->customer)
-                                                    <option value="{{ $serviceInvoice->customer_id }}" selected>
-                                                        {{ $serviceInvoice->customer->name }} ({{ $serviceInvoice->customer->phone }})
-                                                    </option>
-                                                    @endif
-                                                </select>
-                                                @error('customer_id')
-                                                    <div class="text-danger">{{ $message }}</div>
-                                                @enderror
+                                                <input type="text" class="form-control" value="{{ $serviceInvoice->customer ? $serviceInvoice->customer->name . ' (' . $serviceInvoice->customer->phone . ')' : 'N/A' }}" readonly>
+                                                <input type="hidden" name="customer_id" value="{{ $serviceInvoice->customer_id }}">
+                                                <div class="form-text text-muted">Customer cannot be changed for existing invoices</div>
                                             </div>
                                         </div>
                                         <div class="col-md-6">
                                             <div class="mb-3">
                                                 <label for="edit_vehicle_search" class="form-label">Vehicle Number</label>
-                                                <select class="form-select" id="edit_vehicle_search" name="vehicle_no">
-                                                    @if($serviceInvoice->vehicle_no)
-                                                    <option value="{{ $serviceInvoice->vehicle_no }}" selected>{{ $serviceInvoice->vehicle_no }}</option>
-                                                    @else
-                                                    <option value="">Select customer first...</option>
-                                                    @endif
-                                                </select>
-                                                <div class="form-text">Select a customer to see available vehicles</div>
+                                                <input type="text" class="form-control" value="{{ $serviceInvoice->vehicle_no ?? 'N/A' }}" readonly>
+                                                <input type="hidden" name="vehicle_no" value="{{ $serviceInvoice->vehicle_no }}">
+                                                <div class="form-text text-muted">Vehicle cannot be changed for existing invoices</div>
                                             </div>
                                         </div>
                                     </div>
@@ -261,135 +249,59 @@
     @push('scripts')
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
     <script>
     $(document).ready(function() {
-            // Initialize Select2 for customer search
-    $('#edit_customer_search').select2({
-        ajax: {
-            url: '{{ route("service_invoices.customer_search") }}',
-            dataType: 'json',
-            delay: 250,
-            data: function (params) {
-                return {
-                    term: params.term
-                };
-            },
-            processResults: function (data) {
-                return {
-                    results: data
-                };
-            },
-            cache: true
-        },
-        placeholder: 'Search for a customer...',
-        minimumInputLength: 2
-    }).on('select2:select', function(e) {
-        const customerId = e.params.data.id;
-        console.log('Customer selected for edit:', customerId);
-        loadVehicles(customerId);
-    }).on('select2:clear', function(e) {
-        clearVehicles();
-    });
-
-    // Initialize Select2 for vehicle search
-    function loadVehicles(customerId) {
-        console.log('Loading vehicles for edit customer:', customerId);
-        
-        try {
-            // Properly destroy existing Select2 instance
-            if ($('#edit_vehicle_search').hasClass('select2-hidden-accessible')) {
-                $('#edit_vehicle_search').select2('destroy');
-            }
-        } catch (e) {
-            console.warn('Error destroying Select2:', e);
-        }
-
-        // Clear the select element
-        $('#edit_vehicle_search').empty().append('<option value="">Select vehicle...</option>');
-
-        if (!customerId) {
-            $('#edit_vehicle_search').prop('disabled', true);
-            return;
-        }
-
-        $('#edit_vehicle_search').select2({
-            ajax: {
-                url: '{{ route("service_invoices.vehicle_search") }}',
-                dataType: 'json',
-                delay: 250,
-                data: function (params) {
-                    return {
-                        customer_id: customerId,
-                        q: params.term || ''
-                    };
-                },
-                processResults: function (data) {
-                    console.log('Vehicle search results for edit:', data);
-                    return {
-                        results: data
-                    };
-                },
-                cache: true
-            },
-            placeholder: 'Select vehicle...',
-            allowClear: true
-        });
-
-        $('#edit_vehicle_search').prop('disabled', false);
-    }
-
-    function clearVehicles() {
-        try {
-            // Properly destroy existing Select2 instance
-            if ($('#edit_vehicle_search').hasClass('select2-hidden-accessible')) {
-                $('#edit_vehicle_search').select2('destroy');
-            }
-        } catch (e) {
-            console.warn('Error destroying Select2:', e);
-        }
-        $('#edit_vehicle_search').empty().append('<option value="">Select customer first...</option>');
-        $('#edit_vehicle_search').prop('disabled', true);
-    }
+        // Customer and vehicle fields are now readonly in edit mode
+        // No need for Select2 initialization for these fields
 
         // Initialize job search autocomplete
-        $('#edit_job_search').autocomplete({
-            source: function(request, response) {
-                $.get('{{ route("service_invoices.job_search") }}', {
-                    term: request.term
-                }, function(data) {
-                    response(data);
-                });
-            },
-            select: function(event, ui) {
-                $('#edit_selected_job_id').val(ui.item.id);
-                $('#edit_job_price').val(ui.item.price);
-                return false;
-            }
-        }).autocomplete("instance")._renderItem = function(ul, item) {
-            return $("<li>")
-                .append("<div>" + item.text + " - Rs. " + item.price + "</div>")
-                .appendTo(ul);
-        };
+        if ($.fn.autocomplete) {
+            $('#edit_job_search').autocomplete({
+                source: function(request, response) {
+                    $.get('{{ route("service_invoices.job_search") }}', {
+                        term: request.term
+                    }, function(data) {
+                        response(data);
+                    });
+                },
+                select: function(event, ui) {
+                    $('#edit_selected_job_id').val(ui.item.id);
+                    $('#edit_job_price').val(ui.item.price);
+                    return false;
+                }
+            }).autocomplete("instance")._renderItem = function(ul, item) {
+                return $("<li>")
+                    .append("<div>" + item.text + " - Rs. " + item.price + "</div>")
+                    .appendTo(ul);
+            };
+        } else {
+            console.warn('jQuery UI autocomplete not available, using simple input fields');
+        }
 
         // Initialize item search autocomplete
-        $('#edit_item_search').autocomplete({
-            source: function(request, response) {
-                $.get('{{ route("service_invoices.item_search") }}', {
-                    term: request.term
-                }, function(data) {
-                    response(data);
-                });
-            },
-            select: function(event, ui) {
-                $('#edit_selected_item_id').val(ui.item.id);
-                $('#edit_item_price').val(ui.item.price);
-                return false;
-            }
-        }).autocomplete("instance")._renderItem = function(ul, item) {
-            return $("<li>")
-                .append("<div>" + item.text + " - Rs. " + item.price + "</div>")
-                .appendTo(ul);
-        };
+        if ($.fn.autocomplete) {
+            $('#edit_item_search').autocomplete({
+                source: function(request, response) {
+                    $.get('{{ route("service_invoices.item_search") }}', {
+                        term: request.term
+                    }, function(data) {
+                        response(data);
+                    });
+                },
+                select: function(event, ui) {
+                    $('#edit_selected_item_id').val(ui.item.id);
+                    $('#edit_item_price').val(ui.item.price);
+                    return false;
+                }
+            }).autocomplete("instance")._renderItem = function(ul, item) {
+                return $("<li>")
+                    .append("<div>" + item.text + " - Rs. " + item.price + "</div>")
+                    .appendTo(ul);
+            };
+        } else {
+            console.warn('jQuery UI autocomplete not available, using simple input fields');
+        }
 
         // Add job item
         $('#edit_add_job_btn').click(function() {
@@ -449,49 +361,91 @@
 
         // Load job items
         function loadJobItems() {
-            $.get('{{ route("service_invoices.get_job_items") }}', {edit_mode: 1}, function(response) {
-                const tbody = $('#edit_job_items_table tbody');
-                tbody.empty();
-                
-                response.items.forEach(function(item, index) {
-                    tbody.append(`
-                        <tr>
-                            <td>${item.description}</td>
-                            <td>${item.qty}</td>
-                            <td>Rs. ${parseFloat(item.price).toFixed(2)}</td>
-                            <td>Rs. ${parseFloat(item.line_total).toFixed(2)}</td>
-                            <td>
-                                <button type="button" class="btn btn-sm btn-danger" onclick="removeJobItem(${index})">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </td>
-                        </tr>
-                    `);
-                });
+            console.log('Loading job items...');
+            $.ajax({
+                url: '{{ route("service_invoices.get_job_items") }}',
+                method: 'GET',
+                data: {edit_mode: 1},
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json'
+                },
+                success: function(response) {
+                    console.log('Job items response:', response);
+                    const tbody = $('#edit_job_items_table tbody');
+                    tbody.empty();
+                    
+                    if (response.items && response.items.length > 0) {
+                        response.items.forEach(function(item, index) {
+                            tbody.append(`
+                                <tr>
+                                    <td>${item.description}</td>
+                                    <td>${item.qty}</td>
+                                    <td>Rs. ${parseFloat(item.price).toFixed(2)}</td>
+                                    <td>Rs. ${parseFloat(item.line_total).toFixed(2)}</td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-danger" onclick="removeJobItem(${index})">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            `);
+                        });
+                    } else {
+                        tbody.append('<tr><td colspan="5" class="text-center text-muted">No job items found</td></tr>');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error loading job items:', error);
+                    console.error('Status:', status);
+                    console.error('Response:', xhr.responseText);
+                    $('#edit_job_items_table tbody').html('<tr><td colspan="5" class="text-center text-danger">Error loading job items</td></tr>');
+                }
             });
         }
 
         // Load spare items
         function loadSpareItems() {
-            $.get('{{ route("service_invoices.get_spare_items") }}', {edit_mode: 1}, function(response) {
-                const tbody = $('#edit_spare_items_table tbody');
-                tbody.empty();
-                
-                response.items.forEach(function(item, index) {
-                    tbody.append(`
-                        <tr>
-                            <td>${item.description}</td>
-                            <td>${item.qty}</td>
-                            <td>Rs. ${parseFloat(item.price).toFixed(2)}</td>
-                            <td>Rs. ${parseFloat(item.line_total).toFixed(2)}</td>
-                            <td>
-                                <button type="button" class="btn btn-sm btn-danger" onclick="removeSpareItem(${index})">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </td>
-                        </tr>
-                    `);
-                });
+            console.log('Loading spare items...');
+            $.ajax({
+                url: '{{ route("service_invoices.get_spare_items") }}',
+                method: 'GET',
+                data: {edit_mode: 1},
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json'
+                },
+                success: function(response) {
+                    console.log('Spare items response:', response);
+                    const tbody = $('#edit_spare_items_table tbody');
+                    tbody.empty();
+                    
+                    if (response.items && response.items.length > 0) {
+                        response.items.forEach(function(item, index) {
+                            tbody.append(`
+                                <tr>
+                                    <td>${item.description}</td>
+                                    <td>${item.qty}</td>
+                                    <td>Rs. ${parseFloat(item.price).toFixed(2)}</td>
+                                    <td>Rs. ${parseFloat(item.line_total).toFixed(2)}</td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-danger" onclick="removeSpareItem(${index})">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            `);
+                        });
+                    } else {
+                        tbody.append('<tr><td colspan="5" class="text-center text-muted">No spare items found</td></tr>');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error loading spare items:', error);
+                    console.error('Status:', status);
+                    console.error('Response:', xhr.responseText);
+                    $('#edit_spare_items_table tbody').html('<tr><td colspan="5" class="text-center text-danger">Error loading spare items</td></tr>');
+                }
             });
         }
 
@@ -556,15 +510,72 @@
             $('#edit_item_price').val('');
         }
 
+        // Debug: Check session data directly
+        console.log('Session data check:');
+        console.log('Job items in session:', @json(session('edit_service_invoice_job_items', [])));
+        console.log('Spare items in session:', @json(session('edit_service_invoice_spare_items', [])));
+        
         // Load initial data
         loadJobItems();
         loadSpareItems();
         updateTotals();
-
-        // Load initial vehicle data if customer is selected
-        const initialCustomerId = $('#edit_customer_search').val();
-        if (initialCustomerId) {
-            loadVehicles(initialCustomerId);
+        
+        // Fallback: If AJAX fails, load from session data directly
+        setTimeout(function() {
+            const jobItems = @json(session('edit_service_invoice_job_items', []));
+            const spareItems = @json(session('edit_service_invoice_spare_items', []));
+            
+            if (jobItems.length > 0) {
+                console.log('Loading job items from session fallback:', jobItems);
+                renderJobItemsFromSession(jobItems);
+            }
+            
+            if (spareItems.length > 0) {
+                console.log('Loading spare items from session fallback:', spareItems);
+                renderSpareItemsFromSession(spareItems);
+            }
+        }, 2000);
+        
+        function renderJobItemsFromSession(items) {
+            const tbody = $('#edit_job_items_table tbody');
+            tbody.empty();
+            
+            items.forEach(function(item, index) {
+                tbody.append(`
+                    <tr>
+                        <td>${item.description}</td>
+                        <td>${item.qty}</td>
+                        <td>Rs. ${parseFloat(item.price).toFixed(2)}</td>
+                        <td>Rs. ${parseFloat(item.line_total).toFixed(2)}</td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-danger" onclick="removeJobItem(${index})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `);
+            });
+        }
+        
+        function renderSpareItemsFromSession(items) {
+            const tbody = $('#edit_spare_items_table tbody');
+            tbody.empty();
+            
+            items.forEach(function(item, index) {
+                tbody.append(`
+                    <tr>
+                        <td>${item.description}</td>
+                        <td>${item.qty}</td>
+                        <td>Rs. ${parseFloat(item.price).toFixed(2)}</td>
+                        <td>Rs. ${parseFloat(item.line_total).toFixed(2)}</td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-danger" onclick="removeSpareItem(${index})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `);
+            });
         }
     });
     </script>
@@ -573,6 +584,5 @@
     @push('styles')
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/ui-lightness/jquery-ui.css">
-    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
     @endpush
 </x-layout> 

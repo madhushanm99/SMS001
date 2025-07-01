@@ -167,8 +167,19 @@ class ServiceInvoiceController extends Controller
             ];
         })->toArray();
 
+        // Clear any existing session data and set new data
+        session()->forget(['edit_service_invoice_job_items', 'edit_service_invoice_spare_items']);
         session(['edit_service_invoice_job_items' => $jobItems]);
         session(['edit_service_invoice_spare_items' => $spareItems]);
+
+        // Log for debugging
+        \Log::info('Edit invoice session data', [
+            'invoice_id' => $serviceInvoice->id,
+            'job_items_count' => count($jobItems),
+            'spare_items_count' => count($spareItems),
+            'job_items' => $jobItems,
+            'spare_items' => $spareItems
+        ]);
 
         return view('service_invoices.edit', compact('serviceInvoice'));
     }
@@ -194,9 +205,9 @@ class ServiceInvoiceController extends Controller
         }
 
         DB::transaction(function () use ($request, $serviceInvoice, $jobItems, $spareItems) {
+            // In edit mode, customer_id and vehicle_no should remain the same
+            // Only update editable fields
             $serviceInvoice->update([
-                'customer_id' => $request->customer_id,
-                'vehicle_no' => $request->vehicle_no,
                 'mileage' => $request->mileage,
                 'notes' => $request->notes,
             ]);
@@ -471,6 +482,15 @@ class ServiceInvoiceController extends Controller
     {
         $sessionKey = $request->has('edit_mode') ? 'edit_service_invoice_job_items' : 'service_invoice_job_items';
         $items = session()->get($sessionKey, []);
+        
+        \Log::info('Get job items request', [
+            'session_key' => $sessionKey,
+            'edit_mode' => $request->has('edit_mode'),
+            'items_count' => count($items),
+            'items' => $items,
+            'all_session_keys' => array_keys(session()->all())
+        ]);
+        
         return response()->json(['success' => true, 'items' => $items]);
     }
 
@@ -519,6 +539,15 @@ class ServiceInvoiceController extends Controller
     {
         $sessionKey = $request->has('edit_mode') ? 'edit_service_invoice_spare_items' : 'service_invoice_spare_items';
         $items = session()->get($sessionKey, []);
+        
+        \Log::info('Get spare items request', [
+            'session_key' => $sessionKey,
+            'edit_mode' => $request->has('edit_mode'),
+            'items_count' => count($items),
+            'items' => $items,
+            'all_session_keys' => array_keys(session()->all())
+        ]);
+        
         return response()->json(['success' => true, 'items' => $items]);
     }
 } 
