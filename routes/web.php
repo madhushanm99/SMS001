@@ -19,7 +19,7 @@ use App\Http\Controllers\PaymentCategoryController;
 use App\Http\Controllers\PaymentReportController;
 use App\Http\Controllers\CustomerAuthController;
 
-
+use Illuminate\Support\Facades\Cache;
 
 
 
@@ -189,7 +189,7 @@ Route::middleware([
         });
 
         // ===== PAYMENT TRANSACTION SYSTEM =====
-        
+
         // Payment Transactions - Main routes
         Route::prefix('payment-transactions')->name('payment-transactions.')->group(function () {
             Route::get('/', [PaymentTransactionController::class, 'index'])->name('index');
@@ -198,19 +198,19 @@ Route::middleware([
             Route::post('/', [PaymentTransactionController::class, 'store'])->name('store');
             Route::get('/quick-cash-in', [PaymentTransactionController::class, 'quickCashIn'])->name('quick-cash-in');
             Route::get('/quick-cash-out', [PaymentTransactionController::class, 'quickCashOut'])->name('quick-cash-out');
-            
+
             // AJAX search routes
             Route::get('/search/customers', [PaymentTransactionController::class, 'searchCustomers'])->name('search_customers');
             Route::get('/search/suppliers', [PaymentTransactionController::class, 'searchSuppliers'])->name('search_suppliers');
             Route::get('/search/invoices', [PaymentTransactionController::class, 'searchInvoices'])->name('search_invoices');
             Route::get('/search/purchase-orders', [PaymentTransactionController::class, 'searchPurchaseOrders'])->name('search_purchase_orders');
-            
+
             // Individual transaction routes
             Route::get('/{paymentTransaction}', [PaymentTransactionController::class, 'show'])->name('show');
             Route::get('/{paymentTransaction}/edit', [PaymentTransactionController::class, 'edit'])->name('edit');
             Route::put('/{paymentTransaction}', [PaymentTransactionController::class, 'update'])->name('update');
             Route::delete('/{paymentTransaction}', [PaymentTransactionController::class, 'destroy'])->name('destroy');
-            
+
             // Workflow actions
             Route::post('/{paymentTransaction}/approve', [PaymentTransactionController::class, 'approve'])->name('approve');
             Route::post('/{paymentTransaction}/complete', [PaymentTransactionController::class, 'complete'])->name('complete');
@@ -312,7 +312,7 @@ Route::middleware([
         Route::prefix('sales-invoices')->name('sales_invoices.')->group(function () {
             Route::get('/', [SalesInvoiceController::class, 'index'])->name('index');
             Route::get('/create', [SalesInvoiceController::class, 'create'])->name('create');
-            
+
             // AJAX routes - These MUST come before wildcard routes
             Route::get('/search/customers', [SalesInvoiceController::class, 'searchCustomers'])->name('search_customers');
             Route::get('/search/items', [SalesInvoiceController::class, 'searchItems'])->name('search_items');
@@ -321,7 +321,7 @@ Route::middleware([
             Route::get('/session-items', [SalesInvoiceController::class, 'getSessionItems'])->name('get_session_items');
             Route::post('/hold', [SalesInvoiceController::class, 'hold'])->name('hold');
             Route::post('/finalize', [SalesInvoiceController::class, 'finalize'])->name('finalize');
-            
+
             // Wildcard routes - These MUST come after specific routes
             Route::get('/{id}', [SalesInvoiceController::class, 'show'])->name('show');
             Route::get('/{id}/edit', [SalesInvoiceController::class, 'edit'])->name('edit');
@@ -331,7 +331,7 @@ Route::middleware([
             Route::post('/{id}/email', [SalesInvoiceController::class, 'emailInvoice'])->name('email');
             Route::get('/{id}/finalize', [SalesInvoiceController::class, 'finalizeHold'])->name('finalize_hold');
         });
-        
+
         // Keep old route for compatibility
         Route::get('/saleInvoice', function () {
             return redirect()->route('sales_invoices.index');
@@ -352,33 +352,33 @@ Route::middleware([
             Route::get('/{return}', [App\Http\Controllers\InvoiceReturnController::class, 'show'])->name('show');
             Route::get('/{return}/pdf', [App\Http\Controllers\InvoiceReturnController::class, 'pdf'])->name('pdf');
         });
-        
+
         // Keep old route for compatibility
         Route::get('/INVReturn', function () {
             return redirect()->route('invoice_returns.index');
         })->name('INVReturn');
-        
+
         // Service Invoices
         Route::prefix('service-invoices')->name('service_invoices.')->group(function () {
             Route::get('/', [App\Http\Controllers\ServiceInvoiceController::class, 'index'])->name('index');
             Route::get('/create', [App\Http\Controllers\ServiceInvoiceController::class, 'create'])->name('create');
-            
+
             // AJAX routes - These MUST come before wildcard routes
             Route::get('/search/customers', [App\Http\Controllers\ServiceInvoiceController::class, 'customerSearch'])->name('customer_search');
             Route::get('/search/vehicles', [App\Http\Controllers\ServiceInvoiceController::class, 'vehicleSearch'])->name('vehicle_search');
             Route::get('/search/jobs', [App\Http\Controllers\ServiceInvoiceController::class, 'jobSearch'])->name('job_search');
             Route::get('/search/items', [App\Http\Controllers\ServiceInvoiceController::class, 'itemSearch'])->name('item_search');
-            
+
             // Job item management
             Route::post('/jobs/add', [App\Http\Controllers\ServiceInvoiceController::class, 'addJobItem'])->name('add_job_item');
             Route::post('/jobs/remove', [App\Http\Controllers\ServiceInvoiceController::class, 'removeJobItem'])->name('remove_job_item');
             Route::get('/jobs/session', [App\Http\Controllers\ServiceInvoiceController::class, 'getJobItems'])->name('get_job_items');
-            
+
             // Spare item management
             Route::post('/spares/add', [App\Http\Controllers\ServiceInvoiceController::class, 'addSpareItem'])->name('add_spare_item');
             Route::post('/spares/remove', [App\Http\Controllers\ServiceInvoiceController::class, 'removeSpareItem'])->name('remove_spare_item');
             Route::get('/spares/session', [App\Http\Controllers\ServiceInvoiceController::class, 'getSpareItems'])->name('get_spare_items');
-            
+
             // Wildcard routes - These MUST come after specific routes
             Route::post('/', [App\Http\Controllers\ServiceInvoiceController::class, 'store'])->name('store');
             Route::get('/{serviceInvoice}/finalize-options', [App\Http\Controllers\ServiceInvoiceController::class, 'finalizeOptions'])->name('finalize_options');
@@ -392,7 +392,7 @@ Route::middleware([
             Route::get('/{serviceInvoice}/pdf', [App\Http\Controllers\ServiceInvoiceController::class, 'pdf'])->name('pdf');
             Route::post('/{serviceInvoice}/email', [App\Http\Controllers\ServiceInvoiceController::class, 'email'])->name('email');
         });
-        
+
         // Redirect old workOrder route to service invoices
         Route::get('/workOrder', function () {
             return redirect()->route('service_invoices.index');
@@ -477,10 +477,23 @@ Route::prefix('customer')->name('customer.')->group(function () {
         Route::get('/register', [CustomerAuthController::class, 'showRegistrationForm'])->name('register');
         Route::post('/register', [CustomerAuthController::class, 'register']);
     });
-    
+
     // Protected routes
     Route::middleware('auth.customer')->group(function () {
         Route::get('/dashboard', [CustomerAuthController::class, 'dashboard'])->name('dashboard');
         Route::post('/logout', [CustomerAuthController::class, 'logout'])->name('logout');
     });
+});
+
+Route::get('/test-redis', function () {
+    // Store a value in Redis
+    Cache::put('test_redis', 'It works!', 600); // 600 seconds = 10 minutes
+
+    // Retrieve the value
+    $value = Cache::get('test_redis');
+
+    return response()->json([
+        'redis_value' => $value,
+        'status' => $value === 'It works!' ? 'Redis is working ✅' : 'Redis not working ❌',
+    ]);
 });

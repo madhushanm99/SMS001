@@ -7,6 +7,7 @@ use App\Models\Customer;
 use App\Models\VehicleBrand;
 use App\Models\VehicleRoute;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class VehicleController extends Controller
 {
@@ -38,10 +39,15 @@ class VehicleController extends Controller
 
     public function create()
     {
-        $brands = VehicleBrand::where('status', true)->orderBy('name')->get();
-        $routes = VehicleRoute::where('status', true)->orderBy('name')->get();
+        $brands = Cache::remember('active_vehicle_brands', 60 * 60, function () {
+        return VehicleBrand::where('status', true)->orderBy('name')->get();
+    });
 
-        return view('vehicles.create', compact('brands', 'routes'));
+    $routes = Cache::remember('active_vehicle_routes', 60 * 60, function () {
+        return VehicleRoute::where('status', true)->orderBy('name')->get();
+    });
+
+    return view('vehicles.create', compact('brands', 'routes'));
     }
 
     public function store(Request $request)
