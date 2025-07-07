@@ -105,19 +105,24 @@
             $(document).ready(function() {
 
                 $('#item_id').select2({
-                    placeholder: 'Search for a product',
-                    ajax: {
-                        url: '{{ route('items.search') }}',
-                        dataType: 'json',
-                        delay: 250,
-                        processResults: function(data) {
-                            return {
-                                results: data
-                            };
-                        },
-                        cache: true
-                    }
-                });
+    placeholder: 'Search for a product',
+    ajax: {
+        url: '{{ route('items.search') }}',
+        dataType: 'json',
+        delay: 250,
+        data: function (params) {
+            return {
+                q: params.term // this sends the typed value
+            };
+        },
+        processResults: function(data) {
+            return {
+                results: data
+            };
+        },
+        cache: true
+    }
+});
 
                 // When an item is selected from Select2
                 $('#item_id').on('select2:select', function(e) {

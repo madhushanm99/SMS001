@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Log;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Laravel\Pail\ValueObjects\Origin\Console;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Redis;
 
 class PO_Controller extends Controller
 {
@@ -40,51 +42,94 @@ class PO_Controller extends Controller
     public function create()
     {
         $suppliers = DB::table('suppliers')->where('status', true)->get();
-        Session::put('po_temp_items', []); // Reset temp items
+        Session::put('po_temp_items', []); 
         return view('purchase_orders.create', compact('suppliers'));
     }
 
+
+
     public function searchItems(Request $request)
     {
-        $search = $request->input('q');
+        $search = trim($request->input('q'));
+        $results = [];
 
-        $items = DB::table('item')
-            ->where('item_ID', 'like', "%$search%")
-            ->orWhere('item_Name', 'like', "%$search%")
-            ->limit(10)
-            ->get();
 
-        return response()->json($items->map(function ($item) {
-            return [
-                'id' => $item->item_ID,  // Make sure it's 'id' as expected by Select2
-                'text' => "{$item->item_ID} - {$item->item_Name}",
-                'price' => $item->sales_Price,
-                'desc' => $item->catagory_Name,
-            ];
-        }));
+        if ($search !== '') {
+            $cacheKey = 'search_items:' . strtolower($search);
+            $items = Cache::get($cacheKey);
+
+
+            if (!$items) {
+
+                $items = DB::table('item')
+                    ->select('item_ID', 'item_Name', 'sales_Price','catagory_Name')
+                    ->where('item_ID', 'like', "%$search%")
+                    ->orWhere('item_Name', 'like', "%$search%")
+                    ->limit(10)
+                    ->get()
+                    ->toArray();
+
+
+                Cache::put($cacheKey, $items, now()->addMinutes(5));
+            }
+
+
+            foreach ($items as $item) {
+                $itemId = $item->item_ID;
+                Redis::zincrby('search_popularity', 1, $itemId);
+                Redis::hset('item_details', $itemId, json_encode([
+                    'id' => $itemId,
+                    'text' => "{$itemId} - {$item->item_Name}",
+                    'price' => $item->sales_Price,
+                    'desc' => $item->catagory_Name,
+                ]));
+            }
+
+
+            $results = collect($items)->map(function ($item) {
+                return [
+                    'id' => $item->item_ID,
+                    'text' => "{$item->item_ID} - {$item->item_Name}",
+                    'price' => $item->sales_Price,
+                    'desc' => $item->catagory_Name,
+                ];
+            });
+        } else {
+
+            $popularIds = Redis::zrevrange('search_popularity', 0, 9);
+            foreach ($popularIds as $id) {
+                $itemJson = Redis::hget('item_details', $id);
+                if ($itemJson) {
+                    $results[] = json_decode($itemJson, true);
+                }
+            }
+        }
+
+        return response()->json($results);
     }
+
 
 
     public function storeTempItem(Request $request)
     {
         logger('fuck');
         logger(session('temp_po_items'));
-        \Log::info('Adding temp item: ' . $request->item_id);
+        Log::info('Adding temp item: ' . $request->item_id);
         $request->validate([
             'item_id' => 'required',
             'qty' => 'required|integer|min:1',
         ]);
 
-        // Fetch the item details
+
         $item = DB::table('item')->where('item_ID', $request->item_id)->first();
         if (!$item) {
             return response()->json(['success' => false, 'message' => 'Item not found']);
         }
 
-        // Get current session items
+
         $tempItems = session()->get('temp_po_items', []);
 
-        // Check if item already exists, update quantity instead of adding duplicate
+
         $found = false;
         foreach ($tempItems as &$existingItem) {
             if ($existingItem['item_ID'] == $request->item_id) {
@@ -105,28 +150,28 @@ class PO_Controller extends Controller
             ];
         }
 
-        // Save updated list back to session
+
         session(['temp_po_items' => $tempItems]);
 
         return response()->json(['success' => true, 'items' => $tempItems]);
     }
 
     public function removeTempItem(Request $request)
-{
-    $request->validate([
-        'index' => 'required|integer|min:0',
-    ]);
+    {
+        $request->validate([
+            'index' => 'required|integer|min:0',
+        ]);
 
-    $tempItems = session()->get('temp_po_items', []);
+        $tempItems = session()->get('temp_po_items', []);
 
-    if (isset($tempItems[$request->index])) {
-        unset($tempItems[$request->index]); // Remove the selected item
-        $tempItems = array_values($tempItems); // Re-index the array
-        session(['temp_po_items' => $tempItems]);
+        if (isset($tempItems[$request->index])) {
+            unset($tempItems[$request->index]);
+            $tempItems = array_values($tempItems);
+            session(['temp_po_items' => $tempItems]);
+        }
+
+        return response()->json(['success' => true, 'items' => $tempItems]);
     }
-
-    return response()->json(['success' => true, 'items' => $tempItems]);
-}
 
     public function getItemDetails($itemId)
     {
@@ -198,24 +243,24 @@ class PO_Controller extends Controller
             return back()->with('error', 'Approved or Received POs cannot be edited.');
         }
 
-        // Fetch all items in the PO
+
         $poItems = DB::table('po__Item')->where('po_Auto_ID', $id)->get();
         if (!session()->has('temp_po_items')) {
             $tempItems = [];
             foreach ($poItems as $item) {
-                // Fetch item name (or other details) from the item table
+
                 $itemDetails = DB::table('item')->where('item_ID', $item->item_ID)->first();
 
                 $tempItems[] = [
                     'item_ID' => $item->item_ID,
-                    'description' => $itemDetails ? $itemDetails->item_Name : '', // safer
+                    'description' => $itemDetails ? $itemDetails->item_Name : '',
                     'price' => $item->price,
                     'qty' => $item->qty,
                     'line_total' => $item->line_Total,
                 ];
             }
 
-            session(['temp_po_items' => $tempItems]); // Save in session
+            session(['temp_po_items' => $tempItems]);
         }
 
         $suppliers = DB::table('suppliers')->get();
@@ -322,6 +367,16 @@ class PO_Controller extends Controller
 
         return back()->with('success', 'Status updated!');
     }
+
+    public function resetSearchPopularity()
+{
+    Redis::del('search_popularity');
+
+    return response()->json([
+        'status' => 'success',
+        'message' => 'Search popularity reset!'
+    ]);
+}
 }
 
 

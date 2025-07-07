@@ -18,7 +18,7 @@ Route::prefix('suppliers')->group(function () {
     Route::get('list', [SupplierApiController::class, 'list'])->name('api.suppliers.list');
 });
 
-Route::prefix('purchase-orders')->group(function () {
-    Route::get('list', [PurchaseOrderApiController::class, 'list'])->name('api.purchase_orders.list');
-});
+// Route::prefix('purchase-orders')->group(function () {
+//     Route::get('list', [PurchaseOrderApiController::class, 'list'])->name('api.purchase_orders.list');
+// });
 

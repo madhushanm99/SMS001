@@ -20,8 +20,24 @@ use App\Http\Controllers\PaymentReportController;
 use App\Http\Controllers\CustomerAuthController;
 
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Redis;
+
+Route::get('/popular-items', function () {
+    $top = Redis::zrevrange('search_popularity', 0, 10, 'WITHSCORES');
+    $data = [];
+    foreach ($top as $id => $score) {
+        $item = Redis::hget('item_details', $id);
+        if ($item) {
+            $decoded = json_decode($item, true);
+            $decoded['score'] = $score;
+            $data[] = $decoded;
+        }
+    }
+    return response()->json($data);
+});
 
 
+Route::get('/reset-search-popularity', [PO_Controller::class, 'resetSearchPopularity']);
 
 
 Route::middleware([
