@@ -54,7 +54,7 @@ class ServiceInvoiceController extends Controller
     {
         // Clear any existing session data
         session()->forget(['service_invoice_job_items', 'service_invoice_spare_items']);
-        
+
         return view('service_invoices.create');
     }
 
@@ -323,7 +323,7 @@ class ServiceInvoiceController extends Controller
                         'requires_reference' => in_array($request->payment_method_id, ['cheque', 'bank_transfer']),
                     ]
                 );
-                
+
                 // Get or create a payment category for service invoice payments
                 $paymentCategory = PaymentCategory::firstOrCreate(
                     ['code' => 'service_income'],
@@ -381,7 +381,7 @@ class ServiceInvoiceController extends Controller
     public function pdf(ServiceInvoice $serviceInvoice)
     {
         $serviceInvoice->load(['customer', 'vehicle', 'items']);
-        
+
         $pdf = Pdf::loadView('service_invoices.pdf', ['serviceInvoice' => $serviceInvoice,]);
         return $pdf->stream("service_invoice_{$serviceInvoice->invoice_no}.pdf");
     }
@@ -395,9 +395,9 @@ class ServiceInvoiceController extends Controller
         ]);
 
         $serviceInvoice->load(['customer', 'vehicle', 'items']);
-        
+
         $pdf = Pdf::loadView('service_invoices.pdf', compact('serviceInvoice'));
-        
+
         Mail::to($request->email)->send(new InvoiceMail($serviceInvoice, $pdf->output(), $request->message));
 
         return back()->with('success', 'Invoice emailed successfully.');
@@ -407,7 +407,7 @@ class ServiceInvoiceController extends Controller
     public function customerSearch(Request $request)
     {
         $term = $request->get('term', '');
-        
+
         $customers = Customer::where('status', true)
             ->where(function ($query) use ($term) {
                 $query->where('name', 'like', "%$term%")
@@ -480,7 +480,7 @@ class ServiceInvoiceController extends Controller
     public function jobSearch(Request $request)
     {
         $term = $request->get('term', '');
-        
+
         $jobs = JobTypes::where('status', true)
             ->where('jobType', 'like', "%$term%")
             ->limit(10)
@@ -499,7 +499,7 @@ class ServiceInvoiceController extends Controller
     public function itemSearch(Request $request)
     {
         $term = $request->get('term', '');
-        
+
         $items = Products::where('status', true)
             ->where('item_Name', 'like', "%$term%")
             ->limit(10)
@@ -547,7 +547,7 @@ class ServiceInvoiceController extends Controller
 
         $sessionKey = $request->has('edit_mode') ? 'edit_service_invoice_job_items' : 'service_invoice_job_items';
         $items = session()->get($sessionKey, []);
-        
+
         if (isset($items[$request->index])) {
             array_splice($items, $request->index, 1);
             session([$sessionKey => $items]);
@@ -560,7 +560,7 @@ class ServiceInvoiceController extends Controller
     {
         $sessionKey = $request->has('edit_mode') ? 'edit_service_invoice_job_items' : 'service_invoice_job_items';
         $items = session()->get($sessionKey, []);
-        
+
         \Log::info('Get job items request', [
             'session_key' => $sessionKey,
             'edit_mode' => $request->has('edit_mode'),
@@ -568,7 +568,7 @@ class ServiceInvoiceController extends Controller
             'items' => $items,
             'all_session_keys' => array_keys(session()->all())
         ]);
-        
+
         return response()->json(['success' => true, 'items' => $items]);
     }
 
@@ -604,7 +604,7 @@ class ServiceInvoiceController extends Controller
 
         $sessionKey = $request->has('edit_mode') ? 'edit_service_invoice_spare_items' : 'service_invoice_spare_items';
         $items = session()->get($sessionKey, []);
-        
+
         if (isset($items[$request->index])) {
             array_splice($items, $request->index, 1);
             session([$sessionKey => $items]);
@@ -617,7 +617,7 @@ class ServiceInvoiceController extends Controller
     {
         $sessionKey = $request->has('edit_mode') ? 'edit_service_invoice_spare_items' : 'service_invoice_spare_items';
         $items = session()->get($sessionKey, []);
-        
+
         \Log::info('Get spare items request', [
             'session_key' => $sessionKey,
             'edit_mode' => $request->has('edit_mode'),
@@ -625,7 +625,7 @@ class ServiceInvoiceController extends Controller
             'items' => $items,
             'all_session_keys' => array_keys(session()->all())
         ]);
-        
+
         return response()->json(['success' => true, 'items' => $items]);
     }
-} 
+}
