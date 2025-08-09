@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ServiceInvoice;
 use App\Models\ServiceInvoiceItem;
+use App\Jobs\CalculateNextServiceSchedule;
 use App\Models\Customer;
 use App\Models\Vehicle;
 use App\Models\JobTypes;
@@ -126,6 +127,11 @@ class ServiceInvoiceController extends Controller
             // Determine and set service type based on job items
             $invoice->determineServiceType();
         });
+
+        // Dispatch background calculation if finalized
+        if ($isFinalize && $invoice) {
+            CalculateNextServiceSchedule::dispatch($invoice->id);
+        }
 
         // Clear session data
         session()->forget(['service_invoice_job_items', 'service_invoice_spare_items']);
@@ -274,6 +280,9 @@ class ServiceInvoiceController extends Controller
 
         // Determine and set service type based on job items when finalizing
         $serviceInvoice->determineServiceType();
+
+        // Dispatch background calculation
+        CalculateNextServiceSchedule::dispatch($serviceInvoice->id);
 
         return back()->with('success', 'Invoice finalized successfully. You can now add payments.');
     }
