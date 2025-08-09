@@ -63,7 +63,7 @@ class Customer extends Model
     {
         $totalInvoices = $this->salesInvoices()->sum('grand_total');
         $totalPayments = $this->getTotalPayments();
-        
+
         $this->update([
             'balance_credit' => $totalInvoices - $totalPayments
         ]);
@@ -79,5 +79,20 @@ public static function generateCustomID(): string
 public function login()
 {
     return $this->hasOne(CustomerLogin::class, 'customer_custom_id', 'custom_id');
+}
+
+public function vehicles(): HasMany
+{
+    return $this->hasMany(Vehicle::class, 'customer_id');
+}
+
+public function serviceInvoices(): HasMany
+{
+    return $this->hasMany(ServiceInvoice::class, 'customer_id', 'custom_id');
+}
+
+public function appointments(): HasMany
+{
+    return $this->hasMany(Appointment::class, 'customer_id', 'custom_id');
 }
 }

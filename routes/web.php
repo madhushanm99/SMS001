@@ -18,6 +18,12 @@ use App\Http\Controllers\BankAccountController;
 use App\Http\Controllers\PaymentCategoryController;
 use App\Http\Controllers\PaymentReportController;
 use App\Http\Controllers\CustomerAuthController;
+use App\Http\Controllers\CustomerVehicleController;
+use App\Http\Controllers\CustomerInvoiceController;
+use App\Http\Controllers\CustomerServiceHistoryController;
+use App\Http\Controllers\CustomerAppointmentController;
+use App\Http\Controllers\StaffAppointmentController;
+use App\Http\Controllers\NotificationController;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Redis;
@@ -482,6 +488,27 @@ Route::middleware([
     })->name('403');
 
     //Route::get('/suppliers', [SupplierController::class, 'index'])->name('suppliers');
+
+    // Staff Appointment Management
+    Route::prefix('appointments')->name('appointments.')->group(function () {
+        Route::get('/', [StaffAppointmentController::class, 'index'])->name('index');
+        Route::get('/calendar', [StaffAppointmentController::class, 'calendar'])->name('calendar');
+        Route::get('/calendar/data', [StaffAppointmentController::class, 'getCalendarData'])->name('calendar.data');
+        Route::get('/{appointment}', [StaffAppointmentController::class, 'show'])->name('show');
+        Route::patch('/{appointment}/confirm', [StaffAppointmentController::class, 'confirm'])->name('confirm');
+        Route::patch('/{appointment}/reject', [StaffAppointmentController::class, 'reject'])->name('reject');
+        Route::patch('/{appointment}/complete', [StaffAppointmentController::class, 'complete'])->name('complete');
+    });
+
+    // Notification Management
+    Route::prefix('notifications')->name('notifications.')->group(function () {
+        Route::get('/', [NotificationController::class, 'index'])->name('index');
+        Route::get('/unread-count', [NotificationController::class, 'getUnreadCount'])->name('unread-count');
+        Route::get('/recent', [NotificationController::class, 'getRecent'])->name('recent');
+        Route::patch('/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
+        Route::get('/{notification}', [NotificationController::class, 'show'])->name('show');
+        Route::patch('/{notification}/read', [NotificationController::class, 'markAsRead'])->name('mark-read');
+    });
 });
 
 // Customer Authentication Routes
@@ -497,6 +524,42 @@ Route::prefix('customer')->name('customer.')->group(function () {
     // Protected routes
     Route::middleware('auth.customer')->group(function () {
         Route::get('/dashboard', [CustomerAuthController::class, 'dashboard'])->name('dashboard');
+
+                // Vehicle Management Routes
+        Route::prefix('vehicles')->name('vehicles.')->group(function () {
+            Route::get('/', [CustomerVehicleController::class, 'index'])->name('index');
+            Route::get('/create', [CustomerVehicleController::class, 'create'])->name('create');
+            Route::get('/check-availability', [CustomerVehicleController::class, 'checkAvailability'])->name('check-availability');
+            Route::post('/', [CustomerVehicleController::class, 'store'])->name('store');
+            Route::get('/{vehicle}', [CustomerVehicleController::class, 'show'])->name('show');
+            Route::get('/{vehicle}/edit', [CustomerVehicleController::class, 'edit'])->name('edit');
+            Route::put('/{vehicle}', [CustomerVehicleController::class, 'update'])->name('update');
+        });
+
+        // Invoice Management Routes
+        Route::prefix('invoices')->name('invoices.')->group(function () {
+            Route::get('/', [CustomerInvoiceController::class, 'index'])->name('index');
+            Route::get('/{invoice}', [CustomerInvoiceController::class, 'show'])->name('show');
+            Route::get('/{invoice}/download', [CustomerInvoiceController::class, 'downloadPdf'])->name('download');
+        });
+
+        // Service History Routes
+        Route::prefix('services')->name('services.')->group(function () {
+            Route::get('/', [CustomerServiceHistoryController::class, 'index'])->name('index');
+            Route::get('/{serviceInvoice}', [CustomerServiceHistoryController::class, 'show'])->name('show');
+            Route::get('/{serviceInvoice}/download', [CustomerServiceHistoryController::class, 'downloadPdf'])->name('download');
+        });
+
+        // Appointment Routes
+        Route::prefix('appointments')->name('appointments.')->group(function () {
+            Route::get('/', [CustomerAppointmentController::class, 'index'])->name('index');
+            Route::get('/create', [CustomerAppointmentController::class, 'create'])->name('create');
+            Route::post('/', [CustomerAppointmentController::class, 'store'])->name('store');
+            Route::get('/available-slots', [CustomerAppointmentController::class, 'getAvailableSlots'])->name('available-slots');
+            Route::get('/{appointment}', [CustomerAppointmentController::class, 'show'])->name('show');
+            Route::patch('/{appointment}/cancel', [CustomerAppointmentController::class, 'cancel'])->name('cancel');
+        });
+        Route::get('/profile', [CustomerAuthController::class, 'dashboard'])->name('profile');
         Route::post('/logout', [CustomerAuthController::class, 'logout'])->name('logout');
     });
 });

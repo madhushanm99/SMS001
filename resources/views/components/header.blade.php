@@ -27,73 +27,38 @@
 
             <li class="nav-item dropdown">
 
-                <a class="nav-link nav-icon" href="#" data-bs-toggle="dropdown">
+                <a class="nav-link nav-icon" href="#" data-bs-toggle="dropdown" id="notificationDropdown">
                     <i class="bi bi-bell"></i>
-                    <span class="badge bg-primary badge-number">4</span>
+                    <span class="badge bg-primary badge-number" id="notificationCount" style="display: none;">0</span>
                 </a><!-- End Notification Icon -->
 
-                <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow notifications">
-                    <li class="dropdown-header">
-                        You have 4 new notifications
-                        <a href="#"><span class="badge rounded-pill bg-primary p-2 ms-2">View all</span></a>
+                <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow notifications" id="notificationDropdown">
+                    <li class="dropdown-header" id="notificationHeader">
+                        You have <span id="headerNotificationCount">0</span> new notifications
+                        <a href="{{ route('notifications.index') }}"><span class="badge rounded-pill bg-primary p-2 ms-2">View all</span></a>
                     </li>
                     <li>
                         <hr class="dropdown-divider">
                     </li>
 
-                    <li class="notification-item">
-                        <i class="bi bi-exclamation-circle text-warning"></i>
-                        <div>
-                            <h4>Lorem Ipsum</h4>
-                            <p>Quae dolorem earum veritatis oditseno</p>
-                            <p>30 min. ago</p>
-                        </div>
-                    </li>
-
-                    <li>
-                        <hr class="dropdown-divider">
-                    </li>
-
-                    <li class="notification-item">
-                        <i class="bi bi-x-circle text-danger"></i>
-                        <div>
-                            <h4>Lorem Ipsum</h4>
-                            <p>Quae dolorem earum veritatis oditseno</p>
-                            <p>1 hr. ago</p>
-                        </div>
-                    </li>
-
-                    <li>
-                        <hr class="dropdown-divider">
-                    </li>
-
-                    <li class="notification-item">
-                        <i class="bi bi-check-circle text-success"></i>
-                        <div>
-                            <h4>Lorem Ipsum</h4>
-                            <p>Quae dolorem earum veritatis oditseno</p>
-                            <p>2 hrs. ago</p>
-                        </div>
-                    </li>
-
-                    <li>
-                        <hr class="dropdown-divider">
-                    </li>
-
-                    <li class="notification-item">
-                        <i class="bi bi-info-circle text-primary"></i>
-                        <div>
-                            <h4>Lorem Ipsum</h4>
-                            <p>Quae dolorem earum veritatis oditseno</p>
-                            <p>4 hrs. ago</p>
-                        </div>
-                    </li>
+                    <!-- Notification items will be dynamically loaded here -->
+                    <div id="notificationItems">
+                        <li class="notification-item text-center">
+                            <div class="p-3">
+                                <i class="bi bi-hourglass-split"></i>
+                                <p class="mb-0">Loading notifications...</p>
+                            </div>
+                        </li>
+                    </div>
 
                     <li>
                         <hr class="dropdown-divider">
                     </li>
                     <li class="dropdown-footer">
-                        <a href="#">Show all notifications</a>
+                        <a href="{{ route('notifications.index') }}">Show all notifications</a>
+                    </li>
+                    <li class="dropdown-footer">
+                        <a href="#" id="markAllReadBtn">Mark all as read</a>
                     </li>
 
                 </ul><!-- End Notification Dropdown Items -->

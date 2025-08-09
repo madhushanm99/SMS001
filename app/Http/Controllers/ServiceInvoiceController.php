@@ -122,6 +122,9 @@ class ServiceInvoiceController extends Controller
             }
 
             $invoice->calculateTotals();
+
+            // Determine and set service type based on job items
+            $invoice->determineServiceType();
         });
 
         // Clear session data
@@ -250,6 +253,9 @@ class ServiceInvoiceController extends Controller
             }
 
             $serviceInvoice->calculateTotals();
+
+            // Determine and set service type based on job items
+            $serviceInvoice->determineServiceType();
         });
 
         // Clear session data
@@ -265,6 +271,9 @@ class ServiceInvoiceController extends Controller
         }
 
         $serviceInvoice->finalize();
+
+        // Determine and set service type based on job items when finalizing
+        $serviceInvoice->determineServiceType();
 
         return back()->with('success', 'Invoice finalized successfully. You can now add payments.');
     }
