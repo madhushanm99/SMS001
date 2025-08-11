@@ -137,13 +137,13 @@
                       </a>
                   </li>
                   <li>
-                      <a href="{{ route('payment-transactions.quick-cash-in') }}">
-                          <i class="bi bi-cash-coin"></i><span>Quick Cash In</span>
+                      <a href="{{ route('payment-transactions.create', ['type' => 'cash_in']) }}">
+                          <i class="bi bi-cash-coin"></i><span>Cash In</span>
                       </a>
                   </li>
                   <li>
-                      <a href="{{ route('payment-transactions.quick-cash-out') }}">
-                          <i class="bi bi-cash-stack"></i><span>Quick Cash Out</span>
+                      <a href="{{ route('payment-transactions.create', ['type' => 'cash_out']) }}">
+                          <i class="bi bi-cash-stack"></i><span>Cash Out</span>
                       </a>
                   </li>
                   <li>
@@ -159,11 +159,6 @@
                   <li>
                       <a href="{{ route('payment-categories.index') }}">
                           <i class="bi bi-tags"></i><span>Payment Categories</span>
-                      </a>
-                  </li>
-                  <li>
-                      <a href="{{ route('payment-reports.index') }}">
-                          <i class="bi bi-file-earmark-bar-graph"></i><span>Payment Reports</span>
                       </a>
                   </li>
               </ul>

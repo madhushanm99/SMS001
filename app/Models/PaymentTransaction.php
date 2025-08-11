@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use App\Models\BankAccount;
 
 class PaymentTransaction extends Model
 {
@@ -270,7 +271,7 @@ class PaymentTransaction extends Model
         }
 
         $result = $this->update(['status' => 'completed']);
-        
+
         // Update bank account balance if applicable
         if ($result && $this->bank_account_id) {
             $this->bankAccount->updateBalance();
@@ -296,14 +297,14 @@ class PaymentTransaction extends Model
         $lastTransaction = static::whereDate('created_at', today())
             ->latest('transaction_no')
             ->first();
-        
+
         if ($lastTransaction) {
             $lastNumber = (int) substr($lastTransaction->transaction_no, -4);
             $number = $lastNumber + 1;
         } else {
             $number = 1;
         }
-        
+
         return $prefix . $date . str_pad($number, 4, '0', STR_PAD_LEFT);
     }
 
@@ -330,22 +331,22 @@ class PaymentTransaction extends Model
     public static function getTotalCashIn($startDate = null, $endDate = null): float
     {
         $query = static::cashIn()->completed();
-        
+
         if ($startDate && $endDate) {
             $query->byDateRange($startDate, $endDate);
         }
-        
+
         return $query->sum('amount');
     }
 
     public static function getTotalCashOut($startDate = null, $endDate = null): float
     {
         $query = static::cashOut()->completed();
-        
+
         if ($startDate && $endDate) {
             $query->byDateRange($startDate, $endDate);
         }
-        
+
         return $query->sum('amount');
     }
 
@@ -357,21 +358,50 @@ class PaymentTransaction extends Model
     public static function getDashboardSummary(): array
     {
         $today = now()->toDateString();
-        $thisMonth = [now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString()];
-        
+        $startOfMonth = now()->startOfMonth()->toDateString();
+        $endOfMonth = now()->endOfMonth()->toDateString();
+
+        // Today summary
+        $todayCashIn = static::getTotalCashIn($today, $today);
+        $todayCashOut = static::getTotalCashOut($today, $today);
+        $todayTransactions = static::whereDate('transaction_date', $today)->count();
+
+        // Month summary
+        $monthCashIn = static::getTotalCashIn($startOfMonth, $endOfMonth);
+        $monthCashOut = static::getTotalCashOut($startOfMonth, $endOfMonth);
+        $monthTransactions = static::whereBetween('transaction_date', [$startOfMonth, $endOfMonth])->count();
+
+        // Last 7 days daily data
+        $dailyData = [];
+        for ($i = 6; $i >= 0; $i--) {
+            $date = now()->subDays($i)->toDateString();
+            $dailyData[] = [
+                'date' => $date,
+                'cash_in' => (float) static::cashIn()->completed()->whereDate('transaction_date', $date)->sum('amount'),
+                'cash_out' => (float) static::cashOut()->completed()->whereDate('transaction_date', $date)->sum('amount'),
+            ];
+        }
+
+        // Total bank balances across active accounts
+        $bankBalances = BankAccount::active()->sum('current_balance');
+
         return [
             'today' => [
-                'cash_in' => static::getTotalCashIn($today, $today),
-                'cash_out' => static::getTotalCashOut($today, $today),
-                'net_flow' => static::getNetCashFlow($today, $today),
+                'cash_in' => (float) $todayCashIn,
+                'cash_out' => (float) $todayCashOut,
+                'transactions' => (int) $todayTransactions,
+                'net_flow' => (float) ($todayCashIn - $todayCashOut),
             ],
-            'this_month' => [
-                'cash_in' => static::getTotalCashIn($thisMonth[0], $thisMonth[1]),
-                'cash_out' => static::getTotalCashOut($thisMonth[0], $thisMonth[1]),
-                'net_flow' => static::getNetCashFlow($thisMonth[0], $thisMonth[1]),
+            'month' => [
+                'cash_in' => (float) $monthCashIn,
+                'cash_out' => (float) $monthCashOut,
+                'transactions' => (int) $monthTransactions,
+                'net_flow' => (float) ($monthCashIn - $monthCashOut),
             ],
-            'pending_count' => static::pending()->count(),
-            'recent_count' => static::recent(7)->count(),
+            'daily_data' => $dailyData,
+            'bank_balances' => (float) $bankBalances,
+            'pending_count' => (int) static::pending()->count(),
+            'recent_count' => (int) static::recent(7)->count(),
         ];
     }
 }

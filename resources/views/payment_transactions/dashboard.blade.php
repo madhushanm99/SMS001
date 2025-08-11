@@ -103,7 +103,7 @@
                 <div class="card">
                     <div class="card-body">
                         <h5 class="card-title">This Month Summary</h5>
-                        
+
                         <div class="activity">
                             <div class="activity-item d-flex">
                                 <div class="activite-label">Cash In</div>
@@ -155,38 +155,25 @@
                 <div class="card">
                     <div class="card-body">
                         <h5 class="card-title">Quick Actions</h5>
-                        
+
                         <div class="row g-2">
                             <div class="col-6">
-                                <a href="{{ route('payment-transactions.create', ['type' => 'cash_in']) }}" 
+                                <a href="{{ route('payment-transactions.create', ['type' => 'cash_in']) }}"
                                    class="btn btn-success w-100">
                                     <i class="bi bi-plus-circle"></i><br>
                                     <small>Cash In</small>
                                 </a>
                             </div>
                             <div class="col-6">
-                                <a href="{{ route('payment-transactions.create', ['type' => 'cash_out']) }}" 
+                                <a href="{{ route('payment-transactions.create', ['type' => 'cash_out']) }}"
                                    class="btn btn-danger w-100">
                                     <i class="bi bi-plus-circle"></i><br>
                                     <small>Cash Out</small>
                                 </a>
                             </div>
-                            <div class="col-6">
-                                <a href="{{ route('payment-transactions.quick-cash-in') }}" 
-                                   class="btn btn-outline-success w-100">
-                                    <i class="bi bi-lightning"></i><br>
-                                    <small>Quick In</small>
-                                </a>
-                            </div>
-                            <div class="col-6">
-                                <a href="{{ route('payment-transactions.quick-cash-out') }}" 
-                                   class="btn btn-outline-danger w-100">
-                                    <i class="bi bi-lightning"></i><br>
-                                    <small>Quick Out</small>
-                                </a>
-                            </div>
+
                             <div class="col-12">
-                                <a href="{{ route('payment-transactions.index') }}" 
+                                <a href="{{ route('payment-transactions.index') }}"
                                    class="btn btn-outline-primary w-100">
                                     <i class="bi bi-list-ul"></i> View All Transactions
                                 </a>
@@ -257,7 +244,7 @@
                                                 @endswitch
                                             </td>
                                             <td>
-                                                <a href="{{ route('payment-transactions.show', $transaction) }}" 
+                                                <a href="{{ route('payment-transactions.show', $transaction) }}"
                                                    class="btn btn-sm btn-outline-primary">
                                                     <i class="bi bi-eye"></i>
                                                 </a>
@@ -328,15 +315,15 @@
                                                 <td>{{ $transaction->created_by ?? 'N/A' }}</td>
                                                 <td>
                                                     <div class="btn-group" role="group">
-                                                        <button class="btn btn-sm btn-success btn-approve" 
+                                                        <button class="btn btn-sm btn-success btn-approve"
                                                                 data-id="{{ $transaction->id }}" title="Approve">
                                                             <i class="bi bi-check"></i>
                                                         </button>
-                                                        <a href="{{ route('payment-transactions.show', $transaction) }}" 
+                                                        <a href="{{ route('payment-transactions.show', $transaction) }}"
                                                            class="btn btn-sm btn-outline-primary" title="View">
                                                             <i class="bi bi-eye"></i>
                                                         </a>
-                                                        <button class="btn btn-sm btn-outline-danger btn-cancel" 
+                                                        <button class="btn btn-sm btn-outline-danger btn-cancel"
                                                                 data-id="{{ $transaction->id }}" title="Cancel">
                                                             <i class="bi bi-x"></i>
                                                         </button>
@@ -359,7 +346,7 @@
         document.addEventListener("DOMContentLoaded", function() {
             // Cash Flow Chart
             const cashFlowData = @json($summary['daily_data'] ?? []);
-            
+
             if (cashFlowData.length > 0) {
                 const chartOptions = {
                     series: [{
@@ -367,7 +354,7 @@
                         data: cashFlowData.map(d => d.cash_in || 0),
                         color: '#28a745'
                     }, {
-                        name: 'Cash Out', 
+                        name: 'Cash Out',
                         data: cashFlowData.map(d => d.cash_out || 0),
                         color: '#dc3545'
                     }],
@@ -420,7 +407,7 @@
                 const chart = new ApexCharts(document.querySelector("#cashFlowChart"), chartOptions);
                 chart.render();
             } else {
-                document.querySelector("#cashFlowChart").innerHTML = 
+                document.querySelector("#cashFlowChart").innerHTML =
                     '<div class="text-center text-muted py-4"><i class="bi bi-graph-up fs-1"></i><p>No data available for chart</p></div>';
             }
 
@@ -431,7 +418,7 @@
                     const id = e.target.closest('.btn-approve').dataset.id;
                     approveTransaction(id);
                 }
-                
+
                 if (e.target.closest('.btn-cancel')) {
                     e.preventDefault();
                     const id = e.target.closest('.btn-cancel').dataset.id;
@@ -505,4 +492,4 @@
         }
     </script>
     @endpush
-</x-layout> 
+</x-layout>

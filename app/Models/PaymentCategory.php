@@ -107,10 +107,11 @@ class PaymentCategory extends Model
         return $this->children()->exists();
     }
 
-    public function getFullName(): string
+    // Accessors
+    public function getFullNameAttribute(): string
     {
         if ($this->isSubCategory() && $this->parent) {
-            return $this->parent->name . ' → ' . $this->name;
+            return $this->parent->name . ' > ' . $this->name;
         }
         return $this->name;
     }
@@ -131,33 +132,27 @@ class PaymentCategory extends Model
     {
         $childrenIds = $this->children()->pluck('id')->toArray();
         $allIds = array_merge([$this->id], $childrenIds);
-        
+
         return PaymentTransaction::whereIn('payment_category_id', $allIds);
     }
 
     // Static Methods
-    public static function getIncomeOptions(): array
+    public static function getIncomeOptions()
     {
         return static::active()
             ->income()
+            ->with('parent')
             ->orderedBySort()
-            ->get()
-            ->mapWithKeys(function ($category) {
-                return [$category->id => $category->getFullName()];
-            })
-            ->toArray();
+            ->get();
     }
 
-    public static function getExpenseOptions(): array
+    public static function getExpenseOptions()
     {
         return static::active()
             ->expense()
+            ->with('parent')
             ->orderedBySort()
-            ->get()
-            ->mapWithKeys(function ($category) {
-                return [$category->id => $category->getFullName()];
-            })
-            ->toArray();
+            ->get();
     }
 
     public static function getParentOptions(string $type): array
@@ -198,14 +193,14 @@ class PaymentCategory extends Model
     private static function buildTree($categories, $parentId): array
     {
         $tree = [];
-        
+
         if (isset($categories[$parentId])) {
             foreach ($categories[$parentId] as $category) {
                 $category->children_items = static::buildTree($categories, $category->id);
                 $tree[] = $category;
             }
         }
-        
+
         return $tree;
     }
 }

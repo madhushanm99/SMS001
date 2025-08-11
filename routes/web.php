@@ -261,7 +261,7 @@ Route::middleware([
             Route::get('/', [BankAccountController::class, 'index'])->name('index');
             Route::get('/create', [BankAccountController::class, 'create'])->name('create');
             Route::post('/', [BankAccountController::class, 'store'])->name('store');
-            Route::get('/reconcile', [BankAccountController::class, 'reconcileIndex'])->name('reconcile');
+            Route::get('/reconcile', [BankAccountController::class, 'reconcileIndex'])->name('reconcileIndex');
             Route::get('/{bankAccount}', [BankAccountController::class, 'show'])->name('show');
             Route::get('/{bankAccount}/edit', [BankAccountController::class, 'edit'])->name('edit');
             Route::put('/{bankAccount}', [BankAccountController::class, 'update'])->name('update');

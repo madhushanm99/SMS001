@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\BankAccount;
+use App\Models\PaymentTransaction;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
@@ -39,17 +40,40 @@ class BankAccountController extends Controller
             ]);
         }
 
-        // Calculate totals
-        $totalBalance = $bankAccounts->sum('current_balance');
-        $accountCounts = [
-            'total' => $bankAccounts->count(),
-            'active' => $bankAccounts->where('is_active', true)->count(),
+        // Summary for cards expected by the view
+        $summary = [
+            'total_balance' => (float) $bankAccounts->sum('current_balance'),
+            'active_accounts' => (int) $bankAccounts->where('is_active', true)->count(),
+            'unreconciled_count' => (int) $bankAccounts->filter(function ($account) {
+                // Consider unreconciled if computed balance differs from stored current_balance
+                $computed = (float) ($account->opening_balance + $account->getNetFlow());
+                return round($computed - (float) $account->current_balance, 2) !== 0.00;
+            })->count(),
+        ];
+
+        // Recent activity across accounts (last 10 transactions involving bank accounts)
+        $recentActivity = PaymentTransaction::with(['bankAccount'])
+            ->whereNotNull('bank_account_id')
+            ->latest('transaction_date')
+            ->latest('id')
+            ->limit(10)
+            ->get();
+
+        // Chart data: balances per account
+        $chartData = [
+            'balances' => $bankAccounts->map(function ($account) {
+                return [
+                    'account_name' => $account->account_name,
+                    'balance' => (float) $account->current_balance,
+                ];
+            })->values(),
         ];
 
         return view('bank_accounts.index', compact(
-            'bankAccounts', 
-            'totalBalance',
-            'accountCounts'
+            'bankAccounts',
+            'summary',
+            'recentActivity',
+            'chartData'
         ));
     }
 
@@ -108,7 +132,7 @@ class BankAccountController extends Controller
     public function show(BankAccount $bankAccount): View
     {
         $bankAccount->loadCount('paymentTransactions');
-        
+
         // Get recent transactions
         $recentTransactions = $bankAccount->paymentTransactions()
             ->with(['paymentMethod', 'paymentCategory', 'customer', 'supplier'])
@@ -216,7 +240,7 @@ class BankAccountController extends Controller
     {
         try {
             $bankAccount->update(['is_active' => !$bankAccount->is_active]);
-            
+
             $status = $bankAccount->is_active ? 'activated' : 'deactivated';
             return response()->json([
                 'success' => "Bank account {$status} successfully",
@@ -270,7 +294,7 @@ class BankAccountController extends Controller
         try {
             $oldBalance = $bankAccount->current_balance;
             $newBalance = $request->new_balance;
-            
+
             $bankAccount->update([
                 'current_balance' => $newBalance,
                 'last_reconciled_at' => now(),
@@ -358,7 +382,7 @@ class BankAccountController extends Controller
             'closing_balance' => $runningBalance,
             'total_in' => $transactions->where('type', 'cash_in')->sum('amount'),
             'total_out' => $transactions->where('type', 'cash_out')->sum('amount'),
-            'net_flow' => $transactions->where('type', 'cash_in')->sum('amount') - 
+            'net_flow' => $transactions->where('type', 'cash_in')->sum('amount') -
                          $transactions->where('type', 'cash_out')->sum('amount'),
         ];
 

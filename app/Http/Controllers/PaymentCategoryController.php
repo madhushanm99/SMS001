@@ -26,7 +26,7 @@ class PaymentCategoryController extends Controller
         // Handle AJAX/API requests
         if ($request->wantsJson()) {
             $filteredCategories = $categories;
-            
+
             // Filter by type if specified
             if ($request->has('type')) {
                 $filteredCategories = $categories->where('type', $request->type);
@@ -48,22 +48,35 @@ class PaymentCategoryController extends Controller
             ]);
         }
 
-        // Group by type
-        $incomeCategories = $categories->where('type', 'income');
-        $expenseCategories = $categories->where('type', 'expense');
+        // Analytics for charts and table badges
+        $analytics = [
+            'usage_counts' => $categories->mapWithKeys(function ($cat) {
+                return [$cat->id => $cat->payment_transactions_count ?? 0];
+            })->toArray(),
+            'total_amounts' => [],
+        ];
 
-        // Get category statistics
-        $stats = [
-            'total_categories' => $categories->count(),
-            'income_count' => $incomeCategories->count(),
-            'expense_count' => $expenseCategories->count(),
-            'active_count' => $categories->where('is_active', true)->count(),
+        // Basic chart datasets
+        $chartData = [
+            'usage' => $categories->map(function ($cat) {
+                return [
+                    'name' => $cat->name,
+                    'count' => $cat->payment_transactions_count ?? 0,
+                ];
+            })->values(),
+            'volume' => $categories->map(function ($cat) {
+                return [
+                    'name' => $cat->name,
+                    'type' => $cat->type,
+                    'amount' => 0,
+                ];
+            })->values(),
         ];
 
         return view('payment_categories.index', compact(
-            'incomeCategories',
-            'expenseCategories',
-            'stats'
+            'categories',
+            'analytics',
+            'chartData'
         ));
     }
 
@@ -128,7 +141,7 @@ class PaymentCategoryController extends Controller
     {
         $paymentCategory->loadCount('paymentTransactions');
         $paymentCategory->load(['parent', 'children.paymentTransactions']);
-        
+
         // Get recent transactions
         $recentTransactions = $paymentCategory->paymentTransactions()
             ->with(['paymentMethod', 'customer', 'supplier', 'bankAccount'])
@@ -237,7 +250,7 @@ class PaymentCategoryController extends Controller
     {
         try {
             $paymentCategory->update(['is_active' => !$paymentCategory->is_active]);
-            
+
             $status = $paymentCategory->is_active ? 'activated' : 'deactivated';
             return response()->json([
                 'success' => "Payment category {$status} successfully",
@@ -254,7 +267,7 @@ class PaymentCategoryController extends Controller
     public function getByType(Request $request): JsonResponse
     {
         $type = $request->get('type', 'expense');
-        
+
         $categories = PaymentCategory::where('type', $type)
             ->where('is_active', true)
             ->orderBy('sort_order')
@@ -270,7 +283,7 @@ class PaymentCategoryController extends Controller
     public function getTree(Request $request): JsonResponse
     {
         $type = $request->get('type');
-        
+
         $query = PaymentCategory::where('is_active', true)
             ->with('children')
             ->whereNull('parent_id')
@@ -398,7 +411,7 @@ class PaymentCategoryController extends Controller
                     if ($value == $ignoreId) {
                         $fail('Category cannot be parent of itself.');
                     }
-                    
+
                     // Check for circular reference
                     $category = PaymentCategory::find($value);
                     while ($category && $category->parent_id) {

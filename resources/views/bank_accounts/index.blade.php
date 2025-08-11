@@ -19,7 +19,7 @@
                 <a href="{{ route('bank-accounts.create') }}" class="btn btn-primary">
                     <i class="bi bi-plus-circle"></i> Add Account
                 </a>
-                <a href="{{ route('bank-accounts.reconcile') }}" class="btn btn-warning">
+                <a href="{{ route('bank-accounts.reconcileIndex') }}" class="btn btn-warning">
                     <i class="bi bi-check2-square"></i> Reconcile
                 </a>
             </div>
@@ -152,7 +152,7 @@
                                                 <i class="bi bi-x-circle"></i> Inactive
                                             </span>
                                         @endif
-                                        
+
                                         @if($account->needs_reconciliation)
                                             <br><span class="badge bg-warning">
                                                 <i class="bi bi-exclamation-triangle"></i> Needs Reconciliation
@@ -161,20 +161,20 @@
                                     </td>
                                     <td>
                                         <div class="btn-group-vertical" role="group">
-                                            <a href="{{ route('bank-accounts.show', $account) }}" 
+                                            <a href="{{ route('bank-accounts.show', $account) }}"
                                                class="btn btn-sm btn-outline-primary" title="View Details">
                                                 <i class="bi bi-eye"></i>
                                             </a>
-                                            <a href="{{ route('bank-accounts.statement', $account) }}" 
+                                            <a href="{{ route('bank-accounts.statement', $account) }}"
                                                class="btn btn-sm btn-outline-info" title="View Statement">
                                                 <i class="bi bi-file-text"></i>
                                             </a>
-                                            <a href="{{ route('bank-accounts.edit', $account) }}" 
+                                            <a href="{{ route('bank-accounts.edit', $account) }}"
                                                class="btn btn-sm btn-outline-warning" title="Edit">
                                                 <i class="bi bi-pencil"></i>
                                             </a>
                                             @if($account->needs_reconciliation)
-                                                <a href="{{ route('bank-accounts.reconcile', $account) }}" 
+                                                <a href="{{ route('bank-accounts.reconcile', $account) }}"
                                                    class="btn btn-sm btn-outline-warning" title="Reconcile">
                                                     <i class="bi bi-check2-square"></i>
                                                 </a>
@@ -281,4 +281,4 @@
         });
     </script>
     @endpush
-</x-layout> 
+</x-layout>

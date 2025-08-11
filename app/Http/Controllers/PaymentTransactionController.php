@@ -26,10 +26,10 @@ class PaymentTransactionController extends Controller
     public function index(Request $request): View
     {
         $query = PaymentTransaction::with([
-            'paymentMethod', 
-            'bankAccount', 
-            'paymentCategory', 
-            'customer', 
+            'paymentMethod',
+            'bankAccount',
+            'paymentCategory',
+            'customer',
             'supplier'
         ]);
 
@@ -77,9 +77,9 @@ class PaymentTransactionController extends Controller
         $summary = $this->getSummaryData($request);
 
         return view('payment_transactions.index', compact(
-            'transactions', 
-            'paymentMethods', 
-            'statuses', 
+            'transactions',
+            'paymentMethods',
+            'statuses',
             'types',
             'summary'
         ));
@@ -95,10 +95,10 @@ class PaymentTransactionController extends Controller
         $bankAccounts = BankAccount::active()->get();
         $customers = Customer::where('status', true)->orderBy('name')->get();
         $suppliers = Supplier::orderBy('Supp_Name')->get();
-        
+
         // Get categories based on transaction type
         $type = $request->get('type', 'cash_out');
-        $categories = $type === 'cash_in' 
+        $categories = $type === 'cash_in'
             ? PaymentCategory::getIncomeOptions()
             : PaymentCategory::getExpenseOptions();
 
@@ -107,7 +107,7 @@ class PaymentTransactionController extends Controller
 
         return view('payment_transactions.create', compact(
             'paymentMethods',
-            'bankAccounts', 
+            'bankAccounts',
             'categories',
             'customers',
             'suppliers',
@@ -163,6 +163,16 @@ class PaymentTransactionController extends Controller
 
             DB::commit();
 
+            // Optional redirect back to quick forms
+            if ($request->get('redirect') === 'quick-cash-in') {
+                return redirect()->route('payment-transactions.quick-cash-in')
+                    ->with('success', 'Payment recorded successfully. You can add another.');
+            }
+            if ($request->get('redirect') === 'quick-cash-out') {
+                return redirect()->route('payment-transactions.quick-cash-out')
+                    ->with('success', 'Payment recorded successfully. You can add another.');
+            }
+
             return redirect()->route('payment-transactions.show', $transaction)
                 ->with('success', 'Payment transaction created successfully!');
 
@@ -181,7 +191,7 @@ class PaymentTransactionController extends Controller
     {
         $paymentTransaction->load([
             'paymentMethod',
-            'bankAccount', 
+            'bankAccount',
             'paymentCategory.parent',
             'customer',
             'supplier',
@@ -206,8 +216,8 @@ class PaymentTransactionController extends Controller
         $bankAccounts = BankAccount::active()->get();
         $customers = Customer::where('status', true)->orderBy('name')->get();
         $suppliers = Supplier::orderBy('Supp_Name')->get();
-        
-        $categories = $paymentTransaction->type === 'cash_in' 
+
+        $categories = $paymentTransaction->type === 'cash_in'
             ? PaymentCategory::getIncomeOptions()
             : PaymentCategory::getExpenseOptions();
 
@@ -321,12 +331,12 @@ class PaymentTransactionController extends Controller
     {
         try {
             $result = $paymentTransaction->complete();
-            
+
             if ($result) {
                 $this->completeTransaction($paymentTransaction);
                 return response()->json(['success' => 'Transaction completed successfully']);
             }
-            
+
             return response()->json(['error' => 'Transaction cannot be completed'], 400);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Error completing transaction'], 500);
@@ -356,11 +366,11 @@ class PaymentTransactionController extends Controller
     public function dashboard(): View
     {
         $summary = PaymentTransaction::getDashboardSummary();
-        
+
         $recentTransactions = PaymentTransaction::with([
-            'paymentMethod', 
-            'paymentCategory', 
-            'customer', 
+            'paymentMethod',
+            'paymentCategory',
+            'customer',
             'supplier'
         ])
         ->recent(7)
@@ -369,7 +379,7 @@ class PaymentTransactionController extends Controller
         ->get();
 
         $pendingTransactions = PaymentTransaction::with([
-            'paymentMethod', 
+            'paymentMethod',
             'paymentCategory'
         ])
         ->pending()
@@ -379,7 +389,7 @@ class PaymentTransactionController extends Controller
 
         return view('payment_transactions.dashboard', compact(
             'summary',
-            'recentTransactions', 
+            'recentTransactions',
             'pendingTransactions'
         ));
     }
@@ -394,11 +404,19 @@ class PaymentTransactionController extends Controller
         $categories = PaymentCategory::getIncomeOptions();
         $customers = Customer::where('status', true)->orderBy('name')->limit(20)->get();
 
+        $recentTransactions = PaymentTransaction::with(['paymentMethod'])
+            ->cashIn()
+            ->latest('transaction_date')
+            ->latest('id')
+            ->limit(10)
+            ->get();
+
         return view('payment_transactions.quick_cash_in', compact(
             'paymentMethods',
             'bankAccounts',
             'categories',
-            'customers'
+            'customers',
+            'recentTransactions'
         ));
     }
 
@@ -412,11 +430,19 @@ class PaymentTransactionController extends Controller
         $categories = PaymentCategory::getExpenseOptions();
         $suppliers = Supplier::orderBy('Supp_Name')->limit(20)->get();
 
+        $recentTransactions = PaymentTransaction::with(['paymentMethod'])
+            ->cashOut()
+            ->latest('transaction_date')
+            ->latest('id')
+            ->limit(10)
+            ->get();
+
         return view('payment_transactions.quick_cash_out', compact(
             'paymentMethods',
             'bankAccounts',
             'categories',
-            'suppliers'
+            'suppliers',
+            'recentTransactions'
         ));
     }
 
@@ -426,7 +452,7 @@ class PaymentTransactionController extends Controller
     public function searchCustomers(Request $request): JsonResponse
     {
         $search = $request->get('q');
-        
+
         $customers = Customer::where('status', true)
             ->where(function($query) use ($search) {
                 $query->where('name', 'like', "%{$search}%")
@@ -445,7 +471,7 @@ class PaymentTransactionController extends Controller
     public function searchSuppliers(Request $request): JsonResponse
     {
         $search = $request->get('q');
-        
+
         $suppliers = Supplier::where(function($query) use ($search) {
                 $query->where('Supp_Name', 'like', "%{$search}%")
                       ->orWhere('Supp_CustomID', 'like', "%{$search}%")
@@ -455,6 +481,62 @@ class PaymentTransactionController extends Controller
             ->get(['Supp_CustomID as id', 'Supp_Name as name', 'Company_Name', 'Supp_CustomID']);
 
         return response()->json($suppliers);
+    }
+
+    /**
+     * Search sales invoices for AJAX
+     */
+    public function searchInvoices(Request $request): JsonResponse
+    {
+        $search = $request->get('q');
+
+        $invoices = SalesInvoice::with('customer')
+            ->where(function($query) use ($search) {
+                $query->where('invoice_no', 'like', "%{$search}%")
+                      ->orWhere('id', 'like', "%{$search}%")
+                      ->orWhere('customer_id', 'like', "%{$search}%");
+            })
+            ->limit(10)
+            ->get()
+            ->map(function ($invoice) {
+                return [
+                    'id' => $invoice->id,
+                    'text' => sprintf('INV #%s - %s (Outstanding: %0.2f)',
+                        $invoice->invoice_no ?? $invoice->id,
+                        optional($invoice->customer)->name ?? 'N/A',
+                        $invoice->getOutstandingAmount()
+                    ),
+                ];
+            });
+
+        return response()->json($invoices);
+    }
+
+    /**
+     * Search purchase orders for AJAX
+     */
+    public function searchPurchaseOrders(Request $request): JsonResponse
+    {
+        $search = $request->get('q');
+
+        $orders = Po::where(function($query) use ($search) {
+                $query->where('po_No', 'like', "%{$search}%")
+                      ->orWhere('po_Auto_ID', 'like', "%{$search}%")
+                      ->orWhere('supp_Cus_ID', 'like', "%{$search}%");
+            })
+            ->limit(10)
+            ->get()
+            ->map(function ($po) {
+                return [
+                    'id' => $po->po_Auto_ID,
+                    'text' => sprintf('PO #%s - %s',
+                        $po->po_No ?? $po->po_Auto_ID,
+                        $po->supp_Cus_ID
+                    ),
+                ];
+            });
+
+        return response()->json($orders);
     }
 
     // Private helper methods
@@ -570,11 +652,11 @@ class PaymentTransactionController extends Controller
     private function handleAttachments(array $files): array
     {
         $attachments = [];
-        
+
         foreach ($files as $file) {
             $filename = time() . '_' . $file->getClientOriginalName();
             $path = $file->storeAs('payment_attachments', $filename, 'public');
-            
+
             $attachments[] = [
                 'name' => $file->getClientOriginalName(),
                 'path' => $path,
