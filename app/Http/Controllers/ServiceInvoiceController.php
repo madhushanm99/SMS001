@@ -733,4 +733,28 @@ class ServiceInvoiceController extends Controller
 
         return response()->json(['success' => true, 'items' => $items]);
     }
+
+    /**
+     * Build a low stock alert message when stock falls to or below reorder level.
+     */
+    protected function buildReorderAlert(string $itemId, ?string $itemName = null): ?string
+    {
+        try {
+            $product = Products::where('item_ID', $itemId)->first();
+            $stock = Stock::where('item_ID', $itemId)->first();
+            if (!$product || !$stock) {
+                return null;
+            }
+            $reorderLevel = (int) ($product->reorder_level ?? 0);
+            $currentQty = (int) $stock->quantity;
+            if ($reorderLevel > 0 && $currentQty <= $reorderLevel) {
+                $name = $itemName ?: ($product->item_Name ?? $itemId);
+                \App\Services\NotificationService::lowStockReached($itemId, $name, $currentQty, $reorderLevel);
+                return "Low stock: {$name} ({$itemId}) qty {$currentQty} ≤ reorder level {$reorderLevel}";
+            }
+        } catch (\Throwable $e) {
+            // Ignore alert errors
+        }
+        return null;
+    }
 }

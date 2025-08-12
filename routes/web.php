@@ -26,6 +26,7 @@ use App\Http\Controllers\StaffAppointmentController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PublicVehicleController;
 use App\Http\Controllers\ServiceScheduleController;
+use App\Http\Controllers\InsightsController;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\Request;
 
@@ -445,16 +446,13 @@ Route::middleware([
         })->name('serviceReminder');
 
 
-        //STAT Tab
-        Route::get('/overview', function () {
-            return view('Statistics/overview');
-        })->name('insights');
-        Route::get('/overview', action: function () {
-            return view(view: 'Statistics/insights');
-        })->name('insights');
-        Route::get('/reports', function () {
-            return view(view: 'Statistics/reports');
-        })->name('reports');
+        // STAT Tab - Insights (Admin/Manager only)
+        Route::middleware('user.type:admin,manager')->group(function () {
+            Route::get('/overview', [InsightsController::class, 'overview'])->name('overview');
+            Route::get('/insights', [InsightsController::class, 'index'])->name('insights');
+            Route::get('/reports', [InsightsController::class, 'reports'])->name('reports');
+            Route::get('/reports/export', [InsightsController::class, 'exportReport'])->name('reports.export');
+        });
 
         //BackOffice Tab
         Route::get('/generalSetting', function () {

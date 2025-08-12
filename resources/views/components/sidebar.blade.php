@@ -170,17 +170,17 @@
               </a>
               <ul id="charts-nav" class="nav-content collapse " data-bs-parent="#sidebar-nav">
                   <li>
-                      <a href="{{ route('lowStock') }}l">
+                      <a href="{{ route('overview') }}">
                           <i class="bi bi-graph-up-arrow"></i><span>Overview</span>
                       </a>
                   </li>
                   <li>
-                      <a href="{{ route('lowStock') }}">
+                      <a href="{{ route('insights') }}">
                           <i class="bi bi-bar-chart-fill"></i><span>Insights</span>
                       </a>
                   </li>
                   <li>
-                      <a href="{{ route('lowStock') }}">
+                      <a href="{{ route('reports') }}">
                           <i class="bi bi-clipboard-data-fill"></i><span>Reports</span>
                       </a>
                   </li>
