@@ -23,7 +23,7 @@ class ServiceScheduleController extends Controller
     {
         $query = VehicleServiceSchedule::query()
             ->leftJoin('vehicles', 'vehicles.vehicle_no', '=', 'vehicle_service_schedules.vehicle_no')
-            ->leftJoin('customers', 'customers.custom_id', '=', 'vehicles.customer_id')
+            ->leftJoin('customers', 'customers.id', '=', 'vehicles.customer_id')
             ->select([
                 'vehicle_service_schedules.*',
                 'vehicles.customer_id',
@@ -53,6 +53,42 @@ class ServiceScheduleController extends Controller
                 $query->whereNull('vehicle_service_schedules.next_service_date');
             }
         }
+
+        // Add aggregated attempt counts and last send info
+        $query->addSelect([
+            'total_attempts' => function ($sub) {
+                $sub->from('service_reminder_logs as srl')
+                    ->selectRaw('COUNT(*)')
+                    ->whereColumn('srl.vehicle_no', 'vehicle_service_schedules.vehicle_no');
+            },
+            'manual_attempts' => function ($sub) {
+                $sub->from('service_reminder_logs as srl2')
+                    ->selectRaw('COUNT(*)')
+                    ->whereColumn('srl2.vehicle_no', 'vehicle_service_schedules.vehicle_no')
+                    ->where('srl2.source', 'manual');
+            },
+            'auto_attempts' => function ($sub) {
+                $sub->from('service_reminder_logs as srl3')
+                    ->selectRaw('COUNT(*)')
+                    ->whereColumn('srl3.vehicle_no', 'vehicle_service_schedules.vehicle_no')
+                    ->where('srl3.source', 'auto');
+            },
+            'last_sent_at' => function ($sub) {
+                $sub->from('service_reminder_logs as srl4')
+                    ->select('srl4.email_sent_at')
+                    ->whereColumn('srl4.vehicle_no', 'vehicle_service_schedules.vehicle_no')
+                    ->where('srl4.status', 'sent')
+                    ->orderByDesc('srl4.email_sent_at')
+                    ->limit(1);
+            },
+            'last_source' => function ($sub) {
+                $sub->from('service_reminder_logs as srl5')
+                    ->select('srl5.source')
+                    ->whereColumn('srl5.vehicle_no', 'vehicle_service_schedules.vehicle_no')
+                    ->orderByDesc('srl5.created_at')
+                    ->limit(1);
+            },
+        ]);
 
         /** @var LengthAwarePaginator $schedules */
         $schedules = $query->paginate(15)->withQueryString();
@@ -113,6 +149,7 @@ class ServiceScheduleController extends Controller
                 'week_start' => $weekStart->toDateString(),
                 'week_end' => $weekEnd->toDateString(),
                 'attempt' => $attempt,
+                'source' => 'manual',
                 'status' => 'sent',
                 'email_sent_at' => now(),
             ]);
@@ -132,6 +169,7 @@ class ServiceScheduleController extends Controller
                 'week_start' => $weekStart->toDateString(),
                 'week_end' => $weekEnd->toDateString(),
                 'attempt' => $attempt,
+                'source' => 'manual',
                 'status' => 'error',
                 'error_message' => $e->getMessage(),
             ]);

@@ -64,7 +64,10 @@
                                         <th>Customer</th>
                                         <th>Last Service</th>
                                         <th>Next Service</th>
-                                        <th>Days Until Next</th>
+                                        <th>Next In/Overdue</th>
+                                        <th>Reminder Attempts</th>
+                                        <th>Last Sent</th>
+                                        <th>Last Source</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
@@ -86,22 +89,44 @@
                                             </td>
                                             <td>
                                                 @php
-                                                    $days = $row->days_until_next;
                                                     $badgeClass = 'bg-secondary';
+                                                    $label = 'N/A';
                                                     if (!is_null($row->next_service_date)) {
-                                                        $daysDiff = \Carbon\Carbon::parse($row->next_service_date)->diffInDays(now(), false);
-                                                        if ($daysDiff < 0) { $badgeClass = 'bg-primary'; }
-                                                        if ($daysDiff === 0) { $badgeClass = 'bg-info'; }
-                                                        if ($daysDiff > 0) { $badgeClass = 'bg-danger'; }
+                                                        $diffDaysSigned = now()->startOfDay()->diffInDays(\Carbon\Carbon::parse($row->next_service_date)->startOfDay(), false);
+                                                        if ($diffDaysSigned > 0) {
+                                                            $badgeClass = 'bg-primary';
+                                                            $label = $diffDaysSigned . ' days';
+                                                        } elseif ($diffDaysSigned === 0) {
+                                                            $badgeClass = 'bg-info';
+                                                            $label = 'today';
+                                                        } else {
+                                                            $badgeClass = 'bg-danger';
+                                                            $label = abs($diffDaysSigned) . ' days overdue';
+                                                        }
                                                     }
                                                 @endphp
-                                                <span class="badge {{ $badgeClass }}">
-                                                    @if(!is_null($row->next_service_date))
-                                                        {{ \Carbon\Carbon::parse($row->next_service_date)->diffForHumans(['parts'=>2,'short'=>true,'syntax'=>\Carbon\CarbonInterface::DIFF_ABSOLUTE]) }}
-                                                    @else
-                                                        N/A
-                                                    @endif
-                                                </span>
+                                                <span class="badge {{ $badgeClass }}">{{ $label }}</span>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-dark">{{ $row->total_attempts ?? 0 }}</span>
+                                                <div class="small text-muted">Manual: {{ $row->manual_attempts ?? 0 }} | Auto: {{ $row->auto_attempts ?? 0 }}</div>
+                                            </td>
+                                            <td>
+                                                @if(!empty($row->last_sent_at))
+                                                    {{ optional($row->last_sent_at)->format('Y-m-d H:i') ?? '-' }}
+                                                @else
+                                                    -
+                                                @endif
+                                            </td>
+                                            <td>
+                                                @php $src = $row->last_source; @endphp
+                                                @if($src === 'manual')
+                                                    <span class="badge bg-secondary">Manual</span>
+                                                @elseif($src === 'auto')
+                                                    <span class="badge bg-success">Auto</span>
+                                                @else
+                                                    <span class="text-muted">-</span>
+                                                @endif
                                             </td>
                                             <td>
                                                 <form method="POST" action="{{ route('service-schedules.send', $row->vehicle_no) }}" onsubmit="return confirm('Send reminder email now?')">

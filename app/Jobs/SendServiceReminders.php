@@ -95,6 +95,7 @@ class SendServiceReminders implements ShouldQueue
                     'week_start' => $weekStart->toDateString(),
                     'week_end' => $weekEnd->toDateString(),
                     'attempt' => $attempt,
+                    'source' => 'auto',
                     'status' => 'sent',
                     'email_sent_at' => now(),
                 ]);
@@ -111,6 +112,7 @@ class SendServiceReminders implements ShouldQueue
                     'week_start' => $weekStart->toDateString(),
                     'week_end' => $weekEnd->toDateString(),
                     'attempt' => $attempt,
+                    'source' => 'auto',
                     'status' => 'error',
                     'error_message' => $e->getMessage(),
                 ]);
@@ -174,6 +176,7 @@ class SendServiceReminders implements ShouldQueue
                     'week_start' => $weekStart->toDateString(),
                     'week_end' => $weekEnd->toDateString(),
                     'attempt' => 2,
+                    'source' => 'auto',
                     'status' => 'sent',
                     'email_sent_at' => now(),
                 ]);
@@ -190,6 +193,7 @@ class SendServiceReminders implements ShouldQueue
                     'week_start' => $weekStart->toDateString(),
                     'week_end' => $weekEnd->toDateString(),
                     'attempt' => 2,
+                    'source' => 'auto',
                     'status' => 'error',
                     'error_message' => $e->getMessage(),
                 ]);
@@ -207,6 +211,7 @@ class SendServiceReminders implements ShouldQueue
             'week_start' => $weekStart->toDateString(),
             'week_end' => $weekEnd->toDateString(),
             'attempt' => 1,
+            'source' => 'auto',
             'status' => $status,
             'error_message' => $reason,
         ]);
