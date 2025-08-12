@@ -87,6 +87,21 @@
                         </div>
                     </div>
 
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label text-muted">Next Service (approximate)</label>
+                            @php($s = $vehicle->serviceSchedule)
+                            <div>
+                                @if($s && ($s->next_service_date || $s->next_service_mileage))
+                                    {{ $s->next_service_date?->format('d M Y') ?? '—' }} /
+                                    {{ $s->next_service_mileage ? number_format($s->next_service_mileage) . ' km' : '—' }}
+                                @else
+                                    <span class="text-muted">no data to show</span>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+
                     @if($vehicle->last_entry)
                     <div class="row">
                         <div class="col-md-6 mb-3">

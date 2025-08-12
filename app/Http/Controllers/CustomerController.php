@@ -6,6 +6,11 @@ use App\Models\Customer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
+use App\Models\CustomerLogin;
+use App\Notifications\CustomerEmailOtp;
+use Illuminate\Support\Str;
 
 
 class CustomerController extends Controller
@@ -69,7 +74,7 @@ class CustomerController extends Controller
 
         $customId = Customer::generateCustomID();
 
-        Customer::create([
+        $customer = Customer::create([
             'custom_id' => $customId,
             'name' => $request->name,
             'phone' => $request->phone,
@@ -79,8 +84,32 @@ class CustomerController extends Controller
             'address' => $request->address,
             'status' => true,
         ]);
+        // If email provided, create login with default password and email credentials
+        if ($customer->email) {
+            $defaultPassword = Str::random(10);
+            $login = CustomerLogin::create([
+                'customer_custom_id' => $customer->custom_id,
+                'email' => $customer->email,
+                'password' => Hash::make($defaultPassword),
+                'is_active' => true,
+                'must_change_password' => true,
+            ]);
 
-        return redirect()->route('customers.index')->with('success', 'Customer created.');
+            // Generate email verification OTP
+            $otp = (string) random_int(100000, 999999);
+            $login->forceFill([
+                'email_verification_otp' => $otp,
+                'email_verification_otp_expires_at' => now()->addMinutes(10),
+            ])->save();
+
+            // Send credentials and OTP
+            Notification::send($login, new CustomerEmailOtp($otp, 'verify'));
+
+            // Also send a separate mail with credentials (simple notification)
+            $login->notify(new \App\Notifications\CustomerWelcomeCredentials($customer->name, $customer->email, $defaultPassword));
+        }
+
+        return redirect()->route('customers.index')->with('success', 'Customer created. Login credentials sent to email.');
     }
 
     public function show($id)

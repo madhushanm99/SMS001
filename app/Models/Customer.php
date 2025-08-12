@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
+use Carbon\Carbon;
 
 
 class Customer extends Model
@@ -95,4 +96,20 @@ public function appointments(): HasMany
 {
     return $this->hasMany(Appointment::class, 'customer_id', 'custom_id');
 }
+
+    /**
+     * Update the customer's last visit date to the provided date (or today).
+     * Only updates if the new date is later than the current value.
+     */
+    public function updateLastVisit(null|string|\DateTimeInterface $date = null): void
+    {
+        $newDate = $date ? Carbon::parse($date)->toDateString() : now()->toDateString();
+
+        $currentDate = $this->last_visit ? Carbon::parse($this->last_visit)->toDateString() : null;
+
+        if ($currentDate === null || $newDate > $currentDate) {
+            $this->last_visit = $newDate;
+            $this->save();
+        }
+    }
 }

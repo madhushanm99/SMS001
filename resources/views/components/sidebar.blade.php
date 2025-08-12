@@ -220,6 +220,13 @@
           </li><!-- End Profile Page Nav -->
 
           <li class="nav-item">
+              <a class="nav-link collapsed" href="{{ route('service-schedules.index') }}">
+                  <i class="bi bi-calendar-check"></i>
+                  <span>Service Schedules</span>
+              </a>
+          </li>
+
+          <li class="nav-item">
               <a class="nav-link collapsed" href="{{ route('appointments.index') }}">
                   <i class="bi bi-calendar-week"></i>
                   <span>Appointments</span>

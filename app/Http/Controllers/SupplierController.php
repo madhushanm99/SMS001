@@ -81,7 +81,17 @@ class SupplierController extends Controller
     {
         $supplier = Supplier::findOrFail($id);
 
-        return view('Purchase.supplier_show', compact('supplier'));
+        // Load recent GRNs with basic info and related payments for the purchase history tab
+        $purchaseHistory = \App\Models\GRN::with(['items', 'paymentTransactions' => function($q) {
+            $q->where('status', 'completed');
+        }])
+        ->where('supp_Cus_ID', $supplier->Supp_CustomID)
+        ->orderByDesc('grn_date')
+        ->orderByDesc('grn_id')
+        ->limit(20)
+        ->get();
+
+        return view('Purchase.supplier_show', compact('supplier', 'purchaseHistory'));
     }
 
     /**

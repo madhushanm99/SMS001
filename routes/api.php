@@ -20,5 +20,6 @@ Route::prefix('suppliers')->group(function () {
 
 Route::prefix('purchase-orders')->group(function () {
     Route::get('list', [PurchaseOrderApiController::class, 'list'])->name('api.purchase_orders.list');
+    Route::get('by-number', [PurchaseOrderApiController::class, 'byNumber'])->name('api.purchase_orders.by_number');
 });
 

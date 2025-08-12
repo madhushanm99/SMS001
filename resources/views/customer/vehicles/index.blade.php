@@ -30,6 +30,8 @@
                                 <th>Year</th>
                                 <th>Route</th>
                                 <th>Registration Status</th>
+                                <th>Approval</th>
+                                <th>Next Service</th>
                                 <th>Purchase Date</th>
                                 <th>Actions</th>
                             </tr>
@@ -52,6 +54,27 @@
                                         <span class="badge bg-warning">Pending</span>
                                     @endif
                                 </td>
+                                <td>
+                                    @if(!$vehicle->is_approved)
+                                        <span class="badge bg-danger" title="Waiting for staff approval">Approval Pending</span>
+                                    @else
+                                        <span class="badge bg-primary" title="Approved for service invoices">Approved</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    @php($s = $vehicle->serviceSchedule)
+                                    @if($s && ($s->next_service_date || $s->next_service_mileage))
+                                        <div>
+                                            Date: {{ $s->next_service_date ? $s->next_service_date->format('d M Y') : '—' }}
+                                        </div>
+                                        <div>
+                                            Mileage: {{ $s->next_service_mileage ? number_format($s->next_service_mileage) . ' km' : '—' }}
+                                        </div>
+                                        <small class="text-muted">Approximate</small>
+                                    @else
+                                        <span class="text-muted">no data to show</span>
+                                    @endif
+                                </td>
                                 <td>{{ $vehicle->date_of_purchase->format('d M Y') }}</td>
                                 <td>
                                     <div class="btn-group" role="group">
@@ -62,6 +85,9 @@
                                         <a href="{{ route('customer.vehicles.edit', $vehicle) }}"
                                            class="btn btn-sm btn-warning" title="Edit">
                                             <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <a href="{{ route('customer.vehicles.qr', $vehicle) }}" class="btn btn-sm btn-secondary" title="Download QR">
+                                            <i class="bi bi-qr-code"></i>
                                         </a>
                                     </div>
                                 </td>

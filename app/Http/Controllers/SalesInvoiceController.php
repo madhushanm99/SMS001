@@ -24,7 +24,7 @@ class SalesInvoiceController extends Controller
     public function index(Request $request)
     {
         $query = SalesInvoice::query();
-        
+
         // Add search filters
         if ($request->filled('search')) {
             $search = $request->search;
@@ -48,7 +48,7 @@ class SalesInvoiceController extends Controller
         // Payment status filter
         if ($request->filled('payment_status')) {
             $paymentStatus = $request->payment_status;
-            
+
             if ($paymentStatus === 'paid') {
                 $query->whereRaw('(SELECT COALESCE(SUM(amount), 0) FROM payment_transactions WHERE sales_invoice_id = sales_invoices.id AND status = "completed" AND type = "cash_in") >= grand_total');
             } elseif ($paymentStatus === 'partially_paid') {
@@ -75,10 +75,10 @@ class SalesInvoiceController extends Controller
         $paymentMethods = \App\Models\PaymentMethod::where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name', 'code', 'is_active']);
-            
+
         $bankAccounts = \App\Models\BankAccount::orderBy('account_name')
             ->get(['id', 'account_name', 'bank_name']);
-            
+
         $paymentCategories = \App\Models\PaymentCategory::where('is_active', true)
             ->where('type', 'income')
             ->orderBy('name')
@@ -90,20 +90,20 @@ class SalesInvoiceController extends Controller
     public function create()
     {
         session()->forget($this->sessionKey());
-        
+
         // Get payment methods and bank accounts for payment prompt
         $paymentMethods = \App\Models\PaymentMethod::where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name', 'code', 'is_active']);
-            
+
         $bankAccounts = \App\Models\BankAccount::orderBy('account_name')
             ->get(['id', 'account_name', 'bank_name']);
-            
+
         $paymentCategories = \App\Models\PaymentCategory::where('is_active', true)
             ->where('type', 'income')
             ->orderBy('name')
             ->get(['id', 'name', 'description', 'type']);
-        
+
         return view('sales_invoices.create', compact('paymentMethods', 'bankAccounts', 'paymentCategories'));
     }
 
@@ -168,7 +168,7 @@ class SalesInvoiceController extends Controller
         // Check stock availability
         $stock = Stock::where('item_ID', $item->item_ID)->first();
         $availableQty = $stock ? $stock->quantity : 0;
-        
+
         if ($request->qty > $availableQty) {
             return response()->json(['success' => false, 'message' => 'Insufficient stock. Available: ' . $availableQty]);
         }
@@ -192,7 +192,7 @@ class SalesInvoiceController extends Controller
         if ($existingIndex !== null) {
             // Update existing item
             $items[$existingIndex]['qty'] += $request->qty;
-            $items[$existingIndex]['line_total'] = ($unitPrice * $items[$existingIndex]['qty']) - 
+            $items[$existingIndex]['line_total'] = ($unitPrice * $items[$existingIndex]['qty']) -
                                                   (($unitPrice * $items[$existingIndex]['qty'] * $items[$existingIndex]['discount']) / 100);
         } else {
             // Add new item
@@ -220,7 +220,7 @@ class SalesInvoiceController extends Controller
     {
         $key = $this->sessionKey();
         $items = session()->get($key, []);
-        
+
         // Find the item being removed
         $removedItem = null;
         foreach ($items as $item) {
@@ -229,7 +229,7 @@ class SalesInvoiceController extends Controller
                 break;
             }
         }
-        
+
         // If we're editing an invoice and it's finalized, restore stock for removed item
         if ($removedItem && $request->has('invoice_id')) {
             try {
@@ -250,14 +250,14 @@ class SalesInvoiceController extends Controller
                 \Log::error('Error restoring stock during item removal: ' . $e->getMessage());
             }
         }
-        
+
         // Remove item from session
         $items = array_filter($items, function($item) use ($request) {
             return $item['item_id'] !== $request->item_id;
         });
-        
+
         session([$key => array_values($items)]);
-        
+
         return response()->json([
             'success' => true,
             'items' => array_values($items),
@@ -341,7 +341,7 @@ class SalesInvoiceController extends Controller
                 'status' => 'finalized',
                 'created_by' => auth()->user()->name ?? 'System',
             ]);
-            
+
             // Load customer relationship for payment prompt
             $invoice->load('customer');
 
@@ -391,14 +391,14 @@ class SalesInvoiceController extends Controller
     {
         try {
             $invoice = SalesInvoice::with(['customer', 'items'])->findOrFail($id);
-            
+
             // Check if user is authenticated
             if (!auth()->check()) {
                 return redirect()->route('login')->with('error', 'Please login to continue');
             }
-            
+
             $user = auth()->user();
-            
+
             // Allow editing for hold invoices OR finalized invoices for admin/manager
             if ($invoice->status === 'hold') {
                 // Hold invoices can be edited by anyone with access
@@ -455,7 +455,7 @@ class SalesInvoiceController extends Controller
     public function update(Request $request, $id)
     {
         $invoice = SalesInvoice::with('items')->findOrFail($id);
-        
+
         // Check permissions
         if ($invoice->status === 'hold') {
             // Hold invoices can be updated by anyone with access
@@ -493,11 +493,11 @@ class SalesInvoiceController extends Controller
                 foreach ($items as $item) {
                     $stock = Stock::where('item_ID', $item['item_id'])->first();
                     $availableQty = $stock ? $stock->quantity : 0;
-                    
+
                     if ($item['qty'] > $availableQty) {
                         DB::rollBack();
                         return response()->json([
-                            'success' => false, 
+                            'success' => false,
                             'message' => "Insufficient stock for {$item['item_name']}. Available: {$availableQty}"
                         ]);
                     }
@@ -536,8 +536,8 @@ class SalesInvoiceController extends Controller
             DB::commit();
             session()->forget($this->sessionKey());
 
-            $message = $invoice->status === 'finalized' 
-                ? 'Finalized invoice updated successfully' 
+            $message = $invoice->status === 'finalized'
+                ? 'Finalized invoice updated successfully'
                 : 'Invoice updated successfully';
 
             return response()->json([
@@ -555,7 +555,7 @@ class SalesInvoiceController extends Controller
     public function finalizeHold($id)
     {
         $invoice = SalesInvoice::with('items')->findOrFail($id);
-        
+
         if ($invoice->status !== 'hold') {
             return redirect()->route('sales_invoices.index')
                            ->with('error', 'Only hold invoices can be finalized');
@@ -567,7 +567,7 @@ class SalesInvoiceController extends Controller
             foreach ($invoice->items as $item) {
                 $stock = Stock::where('item_ID', $item->item_id)->first();
                 $availableQty = $stock ? $stock->quantity : 0;
-                
+
                 if ($item->qty > $availableQty) {
                     return redirect()->back()
                                    ->with('error', "Insufficient stock for {$item->item_name}. Available: {$availableQty}");
@@ -597,9 +597,9 @@ class SalesInvoiceController extends Controller
     public function pdf($id)
     {
         $invoice = SalesInvoice::with(['customer', 'items'])->findOrFail($id);
-        
+
         $pdf = Pdf::loadView('sales_invoices.pdf', compact('invoice'));
-        
+
         // Open PDF in new tab instead of forcing download
         return $pdf->stream("invoice-{$invoice->invoice_no}.pdf");
     }
@@ -613,7 +613,7 @@ class SalesInvoiceController extends Controller
     public function destroy($id)
     {
         $invoice = SalesInvoice::with('items')->findOrFail($id);
-        
+
         // Check permissions for deleting finalized invoices
         if ($invoice->status === 'finalized' && !in_array(auth()->user()->usertype ?? 'user', ['admin', 'manager'])) {
             return redirect()->back()
@@ -623,7 +623,7 @@ class SalesInvoiceController extends Controller
         DB::beginTransaction();
         try {
             $stockRestorations = [];
-            
+
             // If invoice is finalized, restore stock before deleting
             if ($invoice->status === 'finalized') {
                 foreach ($invoice->items as $item) {
@@ -640,7 +640,7 @@ class SalesInvoiceController extends Controller
                         ];
                     }
                 }
-                
+
                 // Log stock restorations
                 \Log::info('Stock restored during invoice deletion', [
                     'invoice_id' => $invoice->id,
@@ -650,11 +650,11 @@ class SalesInvoiceController extends Controller
             }
 
             $invoice->delete();
-            
+
             DB::commit();
-            
-            $message = $invoice->status === 'finalized' 
-                ? 'Finalized invoice deleted successfully and stock restored for ' . count($stockRestorations) . ' items' 
+
+            $message = $invoice->status === 'finalized'
+                ? 'Finalized invoice deleted successfully and stock restored for ' . count($stockRestorations) . ' items'
                 : 'Invoice deleted successfully';
 
             return redirect()->route('sales_invoices.index')
@@ -674,11 +674,11 @@ class SalesInvoiceController extends Controller
     public function emailInvoice(Request $request, $id)
     {
         $invoice = SalesInvoice::with(['customer', 'items'])->findOrFail($id);
-        
+
         // Check if customer has email
         if (!$invoice->customer->email) {
             return response()->json([
-                'success' => false, 
+                'success' => false,
                 'message' => 'Customer email address is not available'
             ]);
         }
@@ -686,7 +686,7 @@ class SalesInvoiceController extends Controller
         try {
             // Send email with PDF attachment
             Mail::to($invoice->customer->email)
-                ->send(new InvoiceMail($invoice));
+                ->queue(new InvoiceMail($invoice));
 
             return response()->json([
                 'success' => true,
@@ -706,7 +706,7 @@ class SalesInvoiceController extends Controller
         $sessionKey = $this->sessionKey();
         $items = session()->get($sessionKey, []);
         $total = collect($items)->sum('line_total');
-        
+
         return response()->json([
             'success' => true,
             'items' => $items,
@@ -786,4 +786,4 @@ class SalesInvoiceController extends Controller
             ]);
         }
     }
-} 
+}

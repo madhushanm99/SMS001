@@ -13,7 +13,7 @@ use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Queue\SerializesModels;
 use Barryvdh\DomPDF\Facade\Pdf;
 
-class InvoiceMail extends Mailable
+class InvoiceMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
@@ -36,10 +36,10 @@ class InvoiceMail extends Mailable
      */
     public function envelope(): Envelope
     {
-        $subject = $this->invoice instanceof ServiceInvoice 
+        $subject = $this->invoice instanceof ServiceInvoice
             ? "Service Invoice #{$this->invoice->invoice_no} - " . config('app.name')
             : "Invoice #{$this->invoice->invoice_no} - " . config('app.name');
-            
+
         return new Envelope(
             subject: $subject,
         );
@@ -77,14 +77,14 @@ class InvoiceMail extends Mailable
                 )->withMime('application/pdf')
             ];
         }
-        
+
         // Generate PDF based on invoice type
         if ($this->invoice instanceof ServiceInvoice) {
             $pdf = Pdf::loadView('service_invoices.pdf', ['serviceInvoice' => $this->invoice]);
         } else {
             $pdf = Pdf::loadView('sales_invoices.pdf', ['invoice' => $this->invoice]);
         }
-        
+
         return [
             Attachment::fromData(
                 fn () => $pdf->output(),

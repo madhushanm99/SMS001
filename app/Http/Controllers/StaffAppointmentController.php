@@ -109,7 +109,7 @@ class StaffAppointmentController extends Controller
         // Send real-time notification about confirmation
         NotificationService::appointmentConfirmed($appointment, Auth::user()->name ?? Auth::user()->email);
 
-        // Send confirmation email to customer
+        // Send confirmation email to customer (queued)
         $this->sendAppointmentEmail($appointment, 'confirmed');
 
         if ($request->expectsJson()) {
@@ -150,7 +150,7 @@ class StaffAppointmentController extends Controller
         // Send real-time notification about rejection
         NotificationService::appointmentRejected($appointment, Auth::user()->name ?? Auth::user()->email, $request->staff_notes);
 
-        // Send rejection email to customer
+        // Send rejection email to customer (queued)
         $this->sendAppointmentEmail($appointment, 'rejected');
 
         if ($request->expectsJson()) {
@@ -187,6 +187,11 @@ class StaffAppointmentController extends Controller
             'handled_by' => Auth::user()->name ?? Auth::user()->email,
             'handled_at' => now(),
         ]);
+
+        // Update customer's last visit based on completed appointment date
+        if ($appointment->customer) {
+            $appointment->customer->updateLastVisit($appointment->appointment_date);
+        }
 
         // Send real-time notification about completion
         NotificationService::appointmentCompleted($appointment, Auth::user()->name ?? Auth::user()->email);
@@ -284,10 +289,10 @@ class StaffAppointmentController extends Controller
 
             switch ($type) {
                 case 'confirmed':
-                    Mail::to($customer->email)->send(new AppointmentConfirmedMail($appointment));
+                    Mail::to($customer->email)->queue(new AppointmentConfirmedMail($appointment));
                     break;
                 case 'rejected':
-                    Mail::to($customer->email)->send(new AppointmentRejectedMail($appointment));
+                    Mail::to($customer->email)->queue(new AppointmentRejectedMail($appointment));
                     break;
             }
 

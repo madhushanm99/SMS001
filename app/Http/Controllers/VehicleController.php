@@ -11,9 +11,23 @@ use Illuminate\Support\Facades\Cache;
 
 class VehicleController extends Controller
 {
+    public function approve(Request $request, Vehicle $vehicle)
+    {
+        $vehicle->update([
+            'is_approved' => true,
+            'approved_by' => auth()->user()->name ?? auth()->user()->email,
+            'approved_at' => now(),
+        ]);
+
+        if ($request->ajax()) {
+            return response()->json(['success' => true, 'message' => 'Vehicle approved.']);
+        }
+
+        return back()->with('success', 'Vehicle approved successfully.');
+    }
     public function index(Request $request)
     {
-        $query = Vehicle::with(['customer', 'brand', 'route']);
+        $query = Vehicle::with(['customer', 'brand', 'route', 'serviceSchedule']);
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {

@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('customer_custom_id');
             $table->string('email')->unique();
             $table->string('password');
+            $table->timestamp('email_verified_at')->nullable();
             $table->string('reset_token')->nullable();
             $table->timestamp('reset_token_expires_at')->nullable();
             $table->boolean('is_active')->default(true);

@@ -8,7 +8,7 @@
 
     <form id="service-invoice-form" method="POST" action="{{ route('service_invoices.store') }}">
         @csrf
-        
+
         <!-- Tab Navigation -->
         <div class="card">
             <div class="card-header">
@@ -33,13 +33,13 @@
                     </li>
                 </ul>
             </div>
-            
+
             <div class="card-body">
                 <div class="tab-content">
                     <!-- Tab 1: Customer & Vehicle Selection -->
                     <div class="tab-pane fade show active" id="customer-pane" role="tabpanel">
                         <h5 class="mb-4">Customer & Vehicle Information</h5>
-                        
+
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
@@ -49,10 +49,10 @@
                                     </select>
                                 </div>
                             </div>
-                            
+
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label for="vehicle_select" class="form-label">Vehicle</label>
+                                    <label for="vehicle_select" class="form-label">Vehicle <span class="text-muted" style="font-weight: normal;">(only approved)</span></label>
                                     <select name="vehicle_no" id="vehicle_select" class="form-control" disabled>
                                         <option value="">Select customer first...</option>
                                     </select>
@@ -70,17 +70,17 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="mb-3">
                             <label for="notes" class="form-label">Notes</label>
                             <textarea name="notes" id="notes" class="form-control" rows="3" placeholder="Add any additional notes for this service invoice..."></textarea>
                         </div>
                     </div>
-                    
+
                     <!-- Tab 2: Job Types -->
                     <div class="tab-pane fade" id="jobs-pane" role="tabpanel">
                         <h5 class="mb-4">Job Types & Services</h5>
-                        
+
                         <div class="row mb-4">
                             <div class="col-md-6">
                                 <label for="job_selector" class="form-label">Search Job Type</label>
@@ -102,7 +102,7 @@
                                 </button>
                             </div>
                         </div>
-                        
+
                         <div class="card mb-4">
                             <div class="card-header">
                                 <h6 class="mb-0">Added Job Types</h6>
@@ -114,11 +114,11 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Tab 3: Spare Parts -->
                     <div class="tab-pane fade" id="parts-pane" role="tabpanel">
                         <h5 class="mb-4">Spare Parts & Items</h5>
-                        
+
                         <div class="row mb-4">
                             <div class="col-md-6">
                                 <label for="spare_selector" class="form-label">Search Spare Part</label>
@@ -140,7 +140,7 @@
                                 </button>
                             </div>
                         </div>
-                        
+
                         <div class="card mb-4">
                             <div class="card-header">
                                 <h6 class="mb-0">Added Spare Parts</h6>
@@ -151,7 +151,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="card mb-4 bg-light">
                             <div class="card-header">
                                 <h6 class="mb-0">Invoice Summary</h6>
@@ -173,7 +173,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="d-flex justify-content-end">
                             <button type="submit" class="btn btn-warning me-2">
                                 Save as Hold
@@ -198,7 +198,7 @@
             initializeCustomerSearch();
             initializeJobSearch();
             initializeSpareSearch();
-            
+
             // Initialize vehicle select as disabled
             clearVehicles();
         });
@@ -235,7 +235,7 @@
 
         function loadVehicles(customerId) {
             console.log('Loading vehicles for customer:', customerId);
-            
+
             try {
                 // Properly destroy existing Select2 instance if it exists
                 if ($('#vehicle_select').hasClass('select2-hidden-accessible')) {
@@ -244,15 +244,15 @@
             } catch (e) {
                 console.warn('Error destroying Select2:', e);
             }
-            
+
             // Clear and reset the select element
             $('#vehicle_select').empty().append('<option value="">Select vehicle...</option>');
-            
+
             if (!customerId) {
                 $('#vehicle_select').prop('disabled', true);
                 return;
             }
-            
+
             // Initialize new Select2 instance with customer filtering
             $('#vehicle_select').select2({
                 placeholder: 'Select vehicle...',
@@ -276,7 +276,7 @@
                     cache: true
                 }
             });
-            
+
             $('#vehicle_select').prop('disabled', false);
         }
 
@@ -478,4 +478,4 @@
         }
     </script>
     @endpush
-</x-layout> 
+</x-layout>

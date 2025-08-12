@@ -164,7 +164,7 @@ class CustomerAppointmentController extends Controller
 
         // Send confirmation email to customer
         try {
-            Mail::to($customer->email)->send(new AppointmentCreatedMail($appointment));
+            Mail::to($customer->email)->queue(new AppointmentCreatedMail($appointment));
         } catch (\Exception $e) {
             \Log::error('Failed to send appointment created email', [
                 'error' => $e->getMessage(),
@@ -222,7 +222,7 @@ class CustomerAppointmentController extends Controller
 
         // Send cancellation email to customer
         try {
-            Mail::to($customer->email)->send(new AppointmentCancelledMail($appointment));
+            Mail::to($customer->email)->queue(new AppointmentCancelledMail($appointment));
         } catch (\Exception $e) {
             \Log::error('Failed to send appointment cancelled email', [
                 'error' => $e->getMessage(),

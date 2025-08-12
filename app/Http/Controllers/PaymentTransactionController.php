@@ -150,10 +150,13 @@ class PaymentTransactionController extends Controller
                 'created_by' => Auth::user()->name ?? Auth::user()->email,
             ]);
 
-            // Handle file attachments if any
+            // Handle file attachments if any (offload heavy work)
             if ($request->hasFile('attachments')) {
-                $attachments = $this->handleAttachments($request->file('attachments'));
+                $files = $request->file('attachments');
+                // Store minimally now; enqueue post-processing (virus scan, thumbnails, cloud upload)
+                $attachments = $this->handleAttachments($files);
                 $transaction->update(['attachments' => $attachments]);
+                \App\Jobs\ProcessPaymentAttachments::dispatch($transaction->id);
             }
 
             // Auto-complete if not pending approval
@@ -268,10 +271,12 @@ class PaymentTransactionController extends Controller
                 'notes' => $request->notes,
             ]);
 
-            // Handle file attachments
+            // Handle file attachments (offload heavy work)
             if ($request->hasFile('attachments')) {
-                $attachments = $this->handleAttachments($request->file('attachments'));
+                $files = $request->file('attachments');
+                $attachments = $this->handleAttachments($files);
                 $paymentTransaction->update(['attachments' => $attachments]);
+                \App\Jobs\ProcessPaymentAttachments::dispatch($paymentTransaction->id);
             }
 
             DB::commit();

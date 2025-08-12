@@ -68,6 +68,17 @@ class ServiceInvoiceController extends Controller
             'notes' => 'nullable|string',
         ]);
 
+        // If a vehicle is selected, ensure it's approved
+        if ($request->filled('vehicle_no')) {
+            $vehicle = Vehicle::where('vehicle_no', $request->vehicle_no)->first();
+            if (!$vehicle) {
+                return back()->with('error', 'Selected vehicle not found.')->withInput();
+            }
+            if (!$vehicle->is_approved) {
+                return back()->with('error', 'Selected vehicle is pending approval and cannot be used for invoices.')->withInput();
+            }
+        }
+
         $jobItems = session('service_invoice_job_items', []);
         $spareItems = session('service_invoice_spare_items', []);
 
@@ -126,6 +137,14 @@ class ServiceInvoiceController extends Controller
 
             // Determine and set service type based on job items
             $invoice->determineServiceType();
+
+            // If immediately finalized, update customer's last_visit
+            if ($isFinalize) {
+                $customer = $invoice->customer; // relation uses custom_id mapping
+                if ($customer) {
+                    $customer->updateLastVisit($invoice->invoice_date);
+                }
+            }
         });
 
         // Dispatch background calculation if finalized
@@ -281,6 +300,12 @@ class ServiceInvoiceController extends Controller
         // Determine and set service type based on job items when finalizing
         $serviceInvoice->determineServiceType();
 
+        // Update customer's last visit on finalize
+        $customer = $serviceInvoice->customer;
+        if ($customer) {
+            $customer->updateLastVisit($serviceInvoice->invoice_date);
+        }
+
         // Dispatch background calculation
         CalculateNextServiceSchedule::dispatch($serviceInvoice->id);
 
@@ -416,7 +441,7 @@ class ServiceInvoiceController extends Controller
 
         $pdf = Pdf::loadView('service_invoices.pdf', compact('serviceInvoice'));
 
-        Mail::to($request->email)->send(new InvoiceMail($serviceInvoice, $pdf->output(), $request->message));
+        Mail::to($request->email)->queue(new InvoiceMail($serviceInvoice, $pdf->output(), $request->message));
 
         return back()->with('success', 'Invoice emailed successfully.');
     }
@@ -455,7 +480,7 @@ class ServiceInvoiceController extends Controller
             'search_term' => $term
         ]);
 
-        $query = Vehicle::where('status', true);
+        $query = Vehicle::where('status', true)->where('is_approved', true);
 
         if ($customerId) {
             // Find customer by custom_id and get their actual id

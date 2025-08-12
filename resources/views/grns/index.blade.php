@@ -10,6 +10,38 @@
         <div class="alert alert-danger">{{ session('error') }}</div>
     @endif
 
+    <form method="GET" action="{{ route('grns.index') }}" class="mb-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">Search</label>
+                <input type="text" name="search" value="{{ request('search') }}" class="form-control" placeholder="GRN No, PO No, Invoice No">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Supplier</label>
+                <select name="supplier" class="form-select">
+                    <option value="">All Suppliers</option>
+                    @foreach($suppliers as $supplier)
+                        <option value="{{ $supplier->Supp_CustomID }}" {{ request('supplier') == $supplier->Supp_CustomID ? 'selected' : '' }}>
+                            {{ $supplier->Supp_Name }} ({{ $supplier->Supp_CustomID }})
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">From</label>
+                <input type="date" name="date_from" value="{{ request('date_from') }}" class="form-control">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">To</label>
+                <input type="date" name="date_to" value="{{ request('date_to') }}" class="form-control">
+            </div>
+            <div class="col-md-2 d-flex gap-2">
+                <button class="btn btn-secondary w-100">Filter</button>
+                <a class="btn btn-outline-secondary w-100" href="{{ route('grns.index') }}">Reset</a>
+            </div>
+        </div>
+    </form>
+
     <div class="table-responsive">
         <table class="table table-bordered table-sm text-sm">
             <thead class="thead-light">
@@ -29,7 +61,7 @@
                     <tr>
                         <td>{{ $grn->grn_no }}</td>
                         <td>{{ $grn->grn_date }}</td>
-                        <td>{{ $grn->supp_Cus_ID }}</td>
+                        <td>{{ optional($grn->supplier)->Supp_Name ?? $grn->supp_Cus_ID }}</td>
                         <td>{{ $grn->po_No ?? '-' }}</td>
                         <td>{{ $grn->invoice_no ?? '-' }}</td>
                         <td class="text-end">
@@ -44,15 +76,15 @@
                                 @else
                                     <span class="badge bg-danger mb-1">Unpaid</span>
                                 @endif
-                                
+
                                 <small class="text-muted">
                                     Paid: LKR {{ number_format($grn->paid_amount, 2) }}<br>
                                     Balance: LKR {{ number_format($grn->outstanding_amount, 2) }}
                                 </small>
-                                
+
                                 @if($grn->outstanding_amount > 0)
-                                    <button 
-                                        type="button" 
+                                    <button
+                                        type="button"
                                         class="btn btn-sm btn-outline-primary mt-1 payment-btn"
                                         data-grn-id="{{ $grn->grn_id }}"
                                         data-grn-no="{{ $grn->grn_no }}"
@@ -72,12 +104,13 @@
                                         class="btn btn-sm btn-outline-secondary" title="Print PDF">
                                         <i class="bi bi-file-pdf"></i>
                                     </a>
-                                    <a href="{{ route('grns.edit', $grn->grn_id) }}" 
-                                        class="btn btn-sm btn-info" title="Edit GRN">
+                                    @php $isFullyPaid = ($grn->outstanding_amount ?? 0) <= 0; @endphp
+                                    <a href="{{ $isFullyPaid ? '#' : route('grns.edit', $grn->grn_id) }}"
+                                        class="btn btn-sm btn-info {{ $isFullyPaid ? 'disabled' : '' }}" title="{{ $isFullyPaid ? 'Editing disabled for fully paid GRNs' : 'Edit GRN' }}">
                                         <i class="bi bi-pencil"></i>
                                     </a>
                                     @if($grn->paymentTransactions->count() > 0)
-                                        <button type="button" 
+                                        <button type="button"
                                                 class="btn btn-sm btn-success view-payments-btn"
                                                 data-grn-id="{{ $grn->grn_id }}"
                                                 data-grn-no="{{ $grn->grn_no }}"
@@ -86,18 +119,18 @@
                                         </button>
                                     @endif
                                     <form action="{{ route('grns.destroy', $grn->grn_id) }}" method="POST"
-                                        class="d-inline-block delete-form"> 
-                                        @csrf @method('DELETE') 
+                                        class="d-inline-block delete-form">
+                                        @csrf @method('DELETE')
                                         <button type="submit" class="btn btn-sm btn-danger" title="Delete GRN">
                                             <i class="bi bi-trash"></i>
-                                        </button> 
+                                        </button>
                                     </form>
                                 </div>
                             @else
                                 <span class="text-muted">-</span>
                             @endif
                         </td>
-                </tr>                 @empty 
+                </tr>                 @empty
                 <tr>
                     <td colspan="8" class="text-center text-muted">No GRNs found.</td>
                 </tr>
@@ -108,9 +141,9 @@
     </div>
 
     <!-- Include Payment Prompt Modal -->
-    <x-payment-prompt 
-    type="grn" 
-    payment_type="cash_out" 
+    <x-payment-prompt
+    type="grn"
+    payment_type="cash_out"
     title="Record Supplier Payment"
     :payment_methods="$paymentMethods"
     :bank_accounts="$bankAccounts"
@@ -176,7 +209,7 @@
 
                 $('#historyGrnNo').text(grnNo);
                 $('#paymentHistoryModal').modal('show');
-                
+
                 // Load payment history
                 loadPaymentHistory(grnId);
             });
@@ -196,7 +229,7 @@
                     $('#paymentHistoryContent').html(`
                         <div class="alert alert-info">
                             <i class="bi bi-info-circle me-2"></i>
-                            Payment history feature is ready for implementation. 
+                            Payment history feature is ready for implementation.
                             You can create an API endpoint to fetch detailed payment records for GRN ID: ${grnId}
                         </div>
                         <div class="text-center">
@@ -226,7 +259,7 @@
             @if(session('grn_created'))
                 $(document).ready(function() {
                     const grnData = @json(session('grn_created'));
-                    
+
                     if (grnData.prompt_payment) {
                         // Show payment prompt modal
                         showPaymentPrompt({

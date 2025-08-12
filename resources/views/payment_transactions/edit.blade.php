@@ -41,14 +41,14 @@
                             <div class="row mb-3">
                                 <div class="col-md-6">
                                     <label for="transaction_date" class="form-label">Transaction Date *</label>
-                                    <input type="date" name="transaction_date" id="transaction_date" class="form-control" 
+                                    <input type="date" name="transaction_date" id="transaction_date" class="form-control"
                                            value="{{ old('transaction_date', optional($paymentTransaction->transaction_date)->format('Y-m-d')) }}" required>
                                 </div>
                                 <div class="col-md-6">
                                     <label for="amount" class="form-label">Amount (LKR) *</label>
                                     <div class="input-group">
                                         <span class="input-group-text">Rs.</span>
-                                        <input type="number" name="amount" id="amount" class="form-control" step="0.01" min="0.01" 
+                                        <input type="number" name="amount" id="amount" class="form-control" step="0.01" min="0.01"
                                                value="{{ old('amount', $paymentTransaction->amount) }}" required>
                                     </div>
                                 </div>
@@ -57,12 +57,12 @@
                             <div class="row mb-3">
                                 <div class="col-md-8">
                                     <label for="description" class="form-label">Description *</label>
-                                    <input type="text" name="description" id="description" class="form-control" 
+                                    <input type="text" name="description" id="description" class="form-control"
                                            value="{{ old('description', $paymentTransaction->description) }}" required>
                                 </div>
                                 <div class="col-md-4">
                                     <label for="reference_no" class="form-label">Reference Number</label>
-                                    <input type="text" name="reference_no" id="reference_no" class="form-control" 
+                                    <input type="text" name="reference_no" id="reference_no" class="form-control"
                                            value="{{ old('reference_no', $paymentTransaction->reference_no) }}">
                                 </div>
                             </div>
@@ -73,7 +73,7 @@
                                     <select name="payment_method_id" id="payment_method_id" class="form-control" required>
                                         <option value="">Select Payment Method</option>
                                         @foreach($paymentMethods as $method)
-                                            <option value="{{ $method->id }}" 
+                                            <option value="{{ $method->id }}"
                                                 {{ old('payment_method_id', $paymentTransaction->payment_method_id) == $method->id ? 'selected' : '' }}>
                                                 {{ $method->name }}
                                             </option>
@@ -85,7 +85,7 @@
                                     <select name="bank_account_id" id="bank_account_id" class="form-control">
                                         <option value="">Select Bank Account</option>
                                         @foreach($bankAccounts as $account)
-                                            <option value="{{ $account->id }}" 
+                                            <option value="{{ $account->id }}"
                                                 {{ old('bank_account_id', $paymentTransaction->bank_account_id) == $account->id ? 'selected' : '' }}>
                                                 {{ $account->account_name }} - {{ $account->bank_name }} ({{ number_format($account->current_balance, 2) }})
                                             </option>
@@ -100,7 +100,7 @@
                                     <select name="payment_category_id" id="payment_category_id" class="form-control" required>
                                         <option value="">Select Category</option>
                                         @foreach($categories as $category)
-                                            <option value="{{ $category->id }}" 
+                                            <option value="{{ $category->id }}"
                                                 {{ old('payment_category_id', $paymentTransaction->payment_category_id) == $category->id ? 'selected' : '' }}>
                                                 {{ $category->full_name }}
                                             </option>
@@ -120,7 +120,7 @@
                                         <select name="customer_id" id="customer_id" class="form-control select2">
                                             <option value="">Select Customer (Optional)</option>
                                             @foreach($customers as $customer)
-                                                <option value="{{ $customer->custom_id }}" 
+                                                <option value="{{ $customer->custom_id }}"
                                                     {{ old('customer_id', $paymentTransaction->customer_id) == $customer->custom_id ? 'selected' : '' }}>
                                                     {{ $customer->name }} ({{ $customer->custom_id }})
                                                 </option>
@@ -129,7 +129,7 @@
                                     </div>
                                     <div class="col-md-6">
                                         <label for="sales_invoice_id" class="form-label">Sales Invoice</label>
-                                        <input type="number" name="sales_invoice_id" id="sales_invoice_id" class="form-control" 
+                                        <input type="number" name="sales_invoice_id" id="sales_invoice_id" class="form-control"
                                                value="{{ old('sales_invoice_id', $paymentTransaction->sales_invoice_id) }}" placeholder="Invoice ID (optional)">
                                     </div>
                                 @else
@@ -138,7 +138,7 @@
                                         <select name="supplier_id" id="supplier_id" class="form-control select2">
                                             <option value="">Select Supplier (Optional)</option>
                                             @foreach($suppliers as $supplier)
-                                                <option value="{{ $supplier->Supp_CustomID }}" 
+                                                <option value="{{ $supplier->Supp_CustomID }}"
                                                     {{ old('supplier_id', $paymentTransaction->supplier_id) == $supplier->Supp_CustomID ? 'selected' : '' }}>
                                                     {{ $supplier->Supp_Name }} ({{ $supplier->Supp_CustomID }})
                                                 </option>
@@ -147,7 +147,7 @@
                                     </div>
                                     <div class="col-md-6">
                                         <label for="purchase_order_id" class="form-label">Purchase Order</label>
-                                        <input type="number" name="purchase_order_id" id="purchase_order_id" class="form-control" 
+                                        <input type="number" name="purchase_order_id" id="purchase_order_id" class="form-control"
                                                value="{{ old('purchase_order_id', $paymentTransaction->purchase_order_id) }}" placeholder="PO ID (optional)">
                                     </div>
                                 @endif

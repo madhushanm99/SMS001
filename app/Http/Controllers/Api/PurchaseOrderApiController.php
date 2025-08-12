@@ -25,4 +25,17 @@ class PurchaseOrderApiController extends Controller
             ];
         }));
     }
+
+    public function byNumber(Request $request)
+    {
+        $poNo = $request->query('po_no');
+        if (!$poNo) {
+            return response()->json(['message' => 'po_no is required'], 422);
+        }
+        $po = DB::table('po')->where('po_No', $poNo)->first();
+        if (!$po) {
+            return response()->json(['message' => 'PO not found'], 404);
+        }
+        return response()->json($po);
+    }
 }

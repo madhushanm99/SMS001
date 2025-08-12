@@ -47,23 +47,23 @@ class PurchaseReturnController extends Controller
         foreach ($grns as $grn) {
             $items = GRNItem::where('grn_id', $grn->grn_id)->get()->map(function ($item) use ($grn) {
                 $stockQty = Stock::where('item_ID', $item->item_ID)->value('quantity') ?? 0;
-                
+
                 // Calculate the actual unit price with discount applied
                 $actualUnitPrice = $item->qty_received > 0 ? $item->line_total / $item->qty_received : $item->price;
-                
+
                 // Calculate total quantity already returned for this GRN item across all purchase returns
                 $totalReturned = PurchaseReturnItem::whereHas('return', function($query) use ($grn) {
                     $query->where('grn_id', $grn->grn_id)->where('status', true);
                 })
                 ->where('item_ID', $item->item_ID)
                 ->sum('qty_returned');
-                
+
                 // Available quantity for return = GRN received quantity - already returned quantity
                 $availableForReturn = $item->qty_received - $totalReturned;
-                
+
                 // Maximum returnable quantity is the minimum of available for return and stock quantity
                 $maxReturnableQty = min($availableForReturn, $stockQty);
-                
+
                 return [
                     'grn_item_id' => $item->grn_item_id,
                     'item_ID' => $item->item_ID,
@@ -135,7 +135,7 @@ class PurchaseReturnController extends Controller
                 // Check if new return would exceed original GRN quantity
                 $totalAfterReturn = $totalAlreadyReturned + $item['qty_returned'];
                 if ($totalAfterReturn > $grnItem->qty_received) {
-                    return back()->with('error', 
+                    return back()->with('error',
                         "Cannot return {$item['qty_returned']} of {$item['item_ID']}. " .
                         "GRN received: {$grnItem->qty_received}, " .
                         "Already returned: {$totalAlreadyReturned}, " .
@@ -170,13 +170,26 @@ class PurchaseReturnController extends Controller
             }
 
             DB::commit();
-            
+
+            // Email supplier with return details (queued), alert if no email
+            try {
+                $supplier = DB::table('suppliers')->where('Supp_CustomID', $return->supp_Cus_ID)->first();
+                if ($supplier && !empty($supplier->Email)) {
+                    \Mail::to($supplier->Email)->queue(new \App\Mail\PurchaseReturnCreatedMail($return->load('items'), $supplier));
+                    $emailNotice = ' Email sent to supplier (queued).';
+                } else {
+                    $emailNotice = ' Supplier has no email on file.';
+                }
+            } catch (\Throwable $e) {
+                $emailNotice = ' Failed to queue email: ' . $e->getMessage();
+            }
+
             // Check if request wants payment prompt
             if ($request->has('show_payment_prompt')) {
                 $paymentMethods = PaymentMethod::where('is_active', true)->get();
                 $bankAccounts = BankAccount::where('is_active', true)->get();
                 $paymentCategories = PaymentCategory::where('is_active', true)->get();
-                
+
                 return response()->json([
                     'success' => true,
                     'show_payment_prompt' => true,
@@ -187,10 +200,11 @@ class PurchaseReturnController extends Controller
                     'payment_methods' => $paymentMethods,
                     'bank_accounts' => $bankAccounts,
                     'payment_categories' => $paymentCategories,
+                    'notice' => trim($emailNotice ?? ''),
                 ]);
             }
-            
-            return redirect()->route('purchase_returns.index')->with('success', 'Purchase return saved.');
+
+            return redirect()->route('purchase_returns.index')->with('success', 'Purchase return saved.' . ($emailNotice ?? ''));
         } catch (\Throwable $e) {
             DB::rollBack();
             return back()->with('error', 'Error saving return: ' . $e->getMessage());
@@ -211,7 +225,7 @@ class PurchaseReturnController extends Controller
         try {
             $purchaseReturn = PurchaseReturn::findOrFail($id);
             $outstanding = $purchaseReturn->getOutstandingAmount();
-            
+
             if ($request->amount > $outstanding) {
                 return response()->json([
                     'success' => false,

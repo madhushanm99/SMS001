@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Supplier extends Model
 {
@@ -45,6 +46,11 @@ class Supplier extends Model
         return $this->hasMany(PaymentTransaction::class, 'supplier_id', 'Supp_CustomID');
     }
 
+    public function grns(): HasMany
+    {
+        return $this->hasMany(GRN::class, 'supp_Cus_ID', 'Supp_CustomID');
+    }
+
     public function purchaseOrders(): HasMany
     {
         return $this->hasMany(Po::class, 'supp_Cus_ID', 'Supp_CustomID');
@@ -72,7 +78,7 @@ class Supplier extends Model
         $totalOrders = $this->purchaseOrders()
             ->where('orderStatus', 'received')
             ->sum('grand_Total');
-        
+
         return $totalOrders - $this->getTotalPayments();
     }
 

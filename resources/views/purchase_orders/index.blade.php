@@ -56,7 +56,7 @@
                         <tr class="hover:bg-gray-50 text-sm">
                             <td class="px-4 py-2 border">{{ $po->po_No }}</td>
                             <td class="px-4 py-2 border">{{ $po->po_date }}</td>
-                            <td class="px-4 py-2 border">{{ $po->supp_Cus_ID }}</td>
+                            <td class="px-4 py-2 border">{{ $po->supplier_name ?? $po->supp_Cus_ID }}</td>
                             <td class="px-4 py-2 border">Rs. {{ number_format($po->grand_Total, 2) }}</td>
                             <td class="px-4 py-2 border">
                                 <span class="px-2 py-1 rounded text-xs font-semibold {{ getStatusBadge($po->orderStatus) }}">

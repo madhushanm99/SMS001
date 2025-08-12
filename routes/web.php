@@ -24,6 +24,10 @@ use App\Http\Controllers\CustomerServiceHistoryController;
 use App\Http\Controllers\CustomerAppointmentController;
 use App\Http\Controllers\StaffAppointmentController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PublicVehicleController;
+use App\Http\Controllers\ServiceScheduleController;
+use Illuminate\Foundation\Auth\EmailVerificationRequest;
+use Illuminate\Http\Request;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Redis;
@@ -41,6 +45,9 @@ Route::get('/popular-items', function () {
     }
     return response()->json($data);
 });
+
+// Public vehicle service page (via QR)
+Route::get('/v/{vehicleNo}', [PublicVehicleController::class, 'show'])->name('public.vehicle.show');
 
 
 Route::get('/reset-search-popularity', [PO_Controller::class, 'resetSearchPopularity']);
@@ -91,6 +98,7 @@ Route::middleware([
         Route::post('/store-temp-item', [GRNController::class, 'storeTempItem'])->name('store_temp_item');
         Route::post('/remove-temp-item', [GRNController::class, 'removeTempItem'])->name('remove_temp_item');
         Route::get('/fetch-temp-items', [GRNController::class, 'fetchTempItems'])->name('fetch_temp_items');
+        Route::post('/import-from-po', [GRNController::class, 'importFromPO'])->name('import_from_po');
 
     });
 
@@ -166,6 +174,7 @@ Route::middleware([
             Route::get('/{vehicle}/edit', [VehicleController::class, 'edit'])->name('edit');
             Route::put('/{vehicle}', [VehicleController::class, 'update'])->name('update');
             Route::delete('/{vehicle}', [VehicleController::class, 'destroy'])->name('destroy');
+            Route::patch('/{vehicle}/approve', [VehicleController::class, 'approve'])->name('approve');
         });
 
         Route::get('/api/customers/search', [VehicleController::class, 'customerSearch'])->name('customers.search');
@@ -415,6 +424,12 @@ Route::middleware([
             Route::post('/{serviceInvoice}/email', [App\Http\Controllers\ServiceInvoiceController::class, 'email'])->name('email');
         });
 
+        // Service Schedules (Staff view)
+        Route::prefix('service-schedules')->name('service-schedules.')->group(function () {
+            Route::get('/', [ServiceScheduleController::class, 'index'])->name('index');
+            Route::post('/{vehicleNo}/send', [ServiceScheduleController::class, 'sendReminder'])->name('send');
+        });
+
         // Redirect old workOrder route to service invoices
         Route::get('/workOrder', function () {
             return redirect()->route('service_invoices.index');
@@ -519,10 +534,30 @@ Route::prefix('customer')->name('customer.')->group(function () {
         Route::post('/login', [CustomerAuthController::class, 'login']);
         Route::get('/register', [CustomerAuthController::class, 'showRegistrationForm'])->name('register');
         Route::post('/register', [CustomerAuthController::class, 'register']);
+
+        // Passwordless login via email OTP
+        Route::get('/login/otp', [CustomerAuthController::class, 'showOtpLoginRequestForm'])->name('login.otp.request');
+        Route::post('/login/otp', [CustomerAuthController::class, 'sendLoginOtp'])->name('login.otp.send');
+        Route::get('/login/otp/verify', [CustomerAuthController::class, 'showLoginOtpForm'])->name('login.otp.form');
+        Route::post('/login/otp/verify', [CustomerAuthController::class, 'verifyLoginOtp'])->name('login.otp.verify');
     });
 
-    // Protected routes
+    // Authenticated customer routes (email verification flow)
     Route::middleware('auth.customer')->group(function () {
+        // Email verification via OTP
+        Route::get('/email/verify', [CustomerAuthController::class, 'showVerificationOtpForm'])->name('verification.otp.form');
+        Route::post('/email/verify', [CustomerAuthController::class, 'verifyEmailWithOtp'])->name('verification.otp.verify');
+        Route::post('/email/verification-notification', [CustomerAuthController::class, 'resendVerificationOtp'])
+            ->middleware('throttle:6,1')
+            ->name('verification.send');
+
+        // Force change password routes
+        Route::get('/password/force-change', [CustomerAuthController::class, 'showForceChangePasswordForm'])->name('password.force.form');
+        Route::post('/password/force-change', [CustomerAuthController::class, 'forceChangePassword'])->name('password.force.update');
+    });
+
+    // Protected routes (verified customers only) + must change password gate
+    Route::middleware(['auth.customer','verified.customer', App\Http\Middleware\EnsureCustomerChangedDefaultPassword::class])->group(function () {
         Route::get('/dashboard', [CustomerAuthController::class, 'dashboard'])->name('dashboard');
 
                 // Vehicle Management Routes
@@ -534,6 +569,7 @@ Route::prefix('customer')->name('customer.')->group(function () {
             Route::get('/{vehicle}', [CustomerVehicleController::class, 'show'])->name('show');
             Route::get('/{vehicle}/edit', [CustomerVehicleController::class, 'edit'])->name('edit');
             Route::put('/{vehicle}', [CustomerVehicleController::class, 'update'])->name('update');
+            Route::get('/{vehicle}/qr', [CustomerVehicleController::class, 'downloadQr'])->name('qr');
         });
 
         // Invoice Management Routes

@@ -137,11 +137,36 @@
                     selectedItem = e.params.data;
                     $('#item_price').val(selectedItem.price);
                 });
-                $('#po_No').on('select2:select', function(e) {
+                $('#po_No').on('select2:select', async function(e) {
                     let poData = e.params.data;
                     if (poData.supplier_id) {
                         $('#supp_Cus_ID').val(poData.supplier_id).trigger('change');
                         $('#supp_Cus_ID').prop('disabled', true);
+                    }
+                    // Import PO items into GRN temp items
+                    if (poData && poData.id) {
+                        try {
+                            // Need auto ID; API currently returns po_No as id. Fetch PO by number to get auto ID.
+                            const resp = await fetch(`{{ url('/api/purchase-orders/by-number') }}?po_no=${encodeURIComponent(poData.id)}`);
+                            const poInfo = await resp.json();
+                            const poAutoId = poInfo?.po_Auto_ID;
+                            if (poAutoId) {
+                                const res = await fetch(`{{ route('grns.import_from_po') }}`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                                    },
+                                    body: JSON.stringify({ po_auto_id: poAutoId })
+                                });
+                                const data = await res.json();
+                                if (data.success) {
+                                    renderTempItems(data.items);
+                                }
+                            }
+                        } catch (err) {
+                            console.error('Failed to import PO items', err);
+                        }
                     }
                 });
                 $('#add_item_btn').click(async function() {
@@ -199,15 +224,15 @@
                     totalDiscount += discountValue;
                     grandTotal += item.line_total;
                     tbody.innerHTML +=
-                        ` <tr> 
-                            <td>${item.item_ID}</td> 
-                            <td>${item.description}</td> 
-                            <td>Rs. ${parseFloat(item.price).toFixed(2)}</td> 
-                            <td>${item.qty}</td> 
+                        ` <tr>
+                            <td>${item.item_ID}</td>
+                            <td>${item.description}</td>
+                            <td>Rs. ${parseFloat(item.price).toFixed(2)}</td>
+                            <td>${item.qty}</td>
                             <td>${parseFloat(item.discount || 0).toFixed(2)}%</td>
                             <td>Rs. ${discountValue.toFixed(2)}</td>
-                            <td>Rs. ${parseFloat(item.line_total).toFixed(2)}</td> 
-                            <td><button class="btn btn-danger btn-sm" onclick="removeItem(${index})">Remove</button></td> 
+                            <td>Rs. ${parseFloat(item.line_total).toFixed(2)}</td>
+                            <td><button class="btn btn-danger btn-sm" onclick="removeItem(${index})">Remove</button></td>
                         </tr> `;
                 });
                 document.getElementById('total_discount').innerText = totalDiscount.toFixed(2);

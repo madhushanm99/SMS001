@@ -21,15 +21,18 @@ class PO_Controller extends Controller
     public function index(Request $request)
     {
         Session::forget('temp_po_items');
-        $query = DB::table('po')->where('status', 1);
+        $query = DB::table('po')
+            ->leftJoin('suppliers', 'suppliers.Supp_CustomID', '=', 'po.supp_Cus_ID')
+            ->where('po.status', 1)
+            ->select('po.*', 'suppliers.Supp_Name as supplier_name');
         ;
 
         if ($request->filled('supplier')) {
-            $query->where('supp_Cus_ID', $request->supplier);
+            $query->where('po.supp_Cus_ID', $request->supplier);
         }
 
         if ($request->filled('from_date') && $request->filled('to_date')) {
-            $query->whereBetween('po_date', [$request->from_date, $request->to_date]);
+            $query->whereBetween('po.po_date', [$request->from_date, $request->to_date]);
         }
 
         $purchaseOrders = $query->orderByDesc('po_Auto_ID')->paginate(10);
@@ -42,7 +45,7 @@ class PO_Controller extends Controller
     public function create()
     {
         $suppliers = DB::table('suppliers')->where('status', true)->get();
-        Session::put('po_temp_items', []); 
+        Session::put('po_temp_items', []);
         return view('purchase_orders.create', compact('suppliers'));
     }
 
@@ -356,6 +359,11 @@ class PO_Controller extends Controller
 
     public function changeStatus(Request $request, $id)
     {
+        // Allow only managers and admin to change PO status
+        if (!auth()->check() || !in_array(auth()->user()->usertype, ['manager', 'admin'])) {
+            return back()->with('error', 'You do not have permission to change purchase order status.');
+        }
+
         $request->validate([
             'status' => 'required|in:draft,pending,approved,received,cancelled',
         ]);
@@ -364,6 +372,24 @@ class PO_Controller extends Controller
             'orderStatus' => $request->status,
             'updated_at' => now(),
         ]);
+
+        // If status changed to approved, email PO to supplier (queued)
+        if ($request->status === 'approved') {
+            $po = DB::table('po')->where('po_Auto_ID', $id)->first();
+            $supplier = DB::table('suppliers')->where('Supp_CustomID', $po->supp_Cus_ID)->first();
+
+            if ($supplier && !empty($supplier->Email)) {
+                try {
+                    \Mail::to($supplier->Email)->queue(new \App\Mail\PurchaseOrderApprovedMail($po, $supplier));
+                } catch (\Throwable $e) {
+                    // Fail silently but notify user
+                    return back()->with('success', 'Status updated to Approved, but failed to queue email: ' . $e->getMessage());
+                }
+                return back()->with('success', 'Status updated to Approved and PO emailed to supplier (queued).');
+            } else {
+                return back()->with('success', 'Status updated to Approved. Note: Supplier has no email on file.');
+            }
+        }
 
         return back()->with('success', 'Status updated!');
     }

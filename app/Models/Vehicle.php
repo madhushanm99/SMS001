@@ -18,6 +18,9 @@ class Vehicle extends Model
         'date_of_purchase',
         'last_entry',
         'registration_status',
+        'is_approved',
+        'approved_by',
+        'approved_at',
         'status',
     ];
     protected $casts = [
@@ -26,6 +29,8 @@ class Vehicle extends Model
         'year_of_manufacture' => 'integer',
         'status' => 'boolean',
         'registration_status' => 'boolean',
+        'is_approved' => 'boolean',
+        'approved_at' => 'datetime',
     ];
 
     public function customer()
@@ -41,5 +46,10 @@ class Vehicle extends Model
     public function route()
     {
         return $this->belongsTo(VehicleRoute::class);
+    }
+
+    public function serviceSchedule()
+    {
+        return $this->hasOne(VehicleServiceSchedule::class, 'vehicle_no', 'vehicle_no');
     }
 }

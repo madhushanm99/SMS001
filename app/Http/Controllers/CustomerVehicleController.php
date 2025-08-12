@@ -8,6 +8,10 @@ use App\Models\VehicleRoute;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use BaconQrCode\Renderer\Image\SvgImageBackEnd;
+use BaconQrCode\Renderer\RendererStyle\RendererStyle;
+use BaconQrCode\Renderer\ImageRenderer;
+use BaconQrCode\Writer;
 
 class CustomerVehicleController extends Controller
 {
@@ -17,7 +21,7 @@ class CustomerVehicleController extends Controller
     public function index()
     {
         $customer = Auth::guard('customer')->user()->customer;
-        $vehicles = $customer->vehicles()->with(['brand', 'route'])->latest()->get();
+        $vehicles = $customer->vehicles()->with(['brand', 'route', 'serviceSchedule'])->latest()->get();
 
         return view('customer.vehicles.index', compact('vehicles'));
     }
@@ -92,7 +96,7 @@ class CustomerVehicleController extends Controller
             abort(403, 'Unauthorized access to vehicle.');
         }
 
-        $vehicle->load(['brand', 'route']);
+        $vehicle->load(['brand', 'route', 'serviceSchedule']);
 
         return view('customer.vehicles.show', compact('vehicle'));
     }
@@ -177,5 +181,28 @@ class CustomerVehicleController extends Controller
         $exists = $query->exists();
 
         return response()->json(['available' => !$exists]);
+    }
+
+    public function downloadQr(Vehicle $vehicle)
+    {
+        $customer = Auth::guard('customer')->user()->customer;
+        if ($vehicle->customer_id !== $customer->id) {
+            abort(403);
+        }
+
+        $url = route('public.vehicle.show', ['vehicleNo' => $vehicle->vehicle_no]);
+
+        $renderer = new ImageRenderer(
+            new RendererStyle(300),
+            new SvgImageBackEnd()
+        );
+        $writer = new Writer($renderer);
+        $svg = $writer->writeString($url);
+
+        $filename = 'vehicle-' . $vehicle->vehicle_no . '-qr.svg';
+        return response($svg, 200, [
+            'Content-Type' => 'image/svg+xml',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"'
+        ]);
     }
 }

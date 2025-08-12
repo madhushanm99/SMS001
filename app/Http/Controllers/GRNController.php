@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Jobs\RecomputeSupplierTotals;
 
 
 class GRNController extends Controller
@@ -19,14 +20,40 @@ class GRNController extends Controller
         return 'temp_grn_items_' . auth()->id();
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $grns = GRN::where('status', 1)
-            ->with(['items', 'paymentTransactions' => function($query) {
-                $query->where('status', 'completed');
-            }])
-            ->orderByDesc('grn_id')
-            ->paginate(10);
+        $query = GRN::where('status', 1)
+            ->with([
+                'items',
+                'supplier',
+                'paymentTransactions' => function($q) {
+                    $q->where('status', 'completed');
+                }
+            ]);
+
+        // Filters
+        if ($request->filled('search')) {
+            $search = trim($request->get('search'));
+            $query->where(function($q) use ($search) {
+                $q->where('grn_no', 'like', "%{$search}%")
+                  ->orWhere('invoice_no', 'like', "%{$search}%")
+                  ->orWhere('po_No', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('supplier')) {
+            $query->where('supp_Cus_ID', $request->get('supplier'));
+        }
+
+        if ($request->filled('date_from')) {
+            $query->where('grn_date', '>=', $request->get('date_from'));
+        }
+
+        if ($request->filled('date_to')) {
+            $query->where('grn_date', '<=', $request->get('date_to'));
+        }
+
+        $grns = $query->orderByDesc('grn_id')->paginate(10)->withQueryString();
 
         // Calculate payment status for each GRN
         foreach ($grns as $grn) {
@@ -40,16 +67,19 @@ class GRNController extends Controller
         $paymentMethods = \App\Models\PaymentMethod::where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name', 'code', 'is_active']);
-            
+
         $bankAccounts = \App\Models\BankAccount::orderBy('account_name')
             ->get(['id', 'account_name', 'bank_name']);
-            
+
         $paymentCategories = \App\Models\PaymentCategory::where('is_active', true)
             ->where('type', 'expense')
             ->orderBy('name')
             ->get(['id', 'name', 'description', 'type']);
 
-        return view('grns.index', compact('grns', 'paymentMethods', 'bankAccounts', 'paymentCategories'));
+        // Suppliers for filter dropdown
+        $suppliers = \App\Models\Supplier::orderBy('Supp_Name')->get(['Supp_CustomID', 'Supp_Name']);
+
+        return view('grns.index', compact('grns', 'paymentMethods', 'bankAccounts', 'paymentCategories', 'suppliers'));
     }
 
     public function create()
@@ -72,7 +102,7 @@ class GRNController extends Controller
 
         $key = $this->sessionKey();
         $items = session()->get($key, []);
-        
+
         $discount = $request->discount ?? 0;
         $subtotal = $request->qty * $item->sales_Price;
         $discountAmount = ($subtotal * $discount) / 100;
@@ -125,6 +155,51 @@ class GRNController extends Controller
         ]);
     }
 
+    public function importFromPO(Request $request)
+    {
+        $request->validate([
+            'po_auto_id' => 'required|exists:po,po_Auto_ID',
+        ]);
+
+        $poId = (int) $request->po_auto_id;
+        $po = DB::table('po')->where('po_Auto_ID', $poId)->first();
+        if (!$po) {
+            return response()->json(['success' => false, 'message' => 'PO not found'], 404);
+        }
+
+        // Load PO items
+        $poItems = DB::table('po__Item')
+            ->join('item', 'po__Item.item_ID', '=', 'item.item_ID')
+            ->where('po__Item.po_Auto_ID', $poId)
+            ->select('po__Item.item_ID', 'item.item_Name', 'po__Item.price', 'po__Item.qty', 'po__Item.line_Total')
+            ->get();
+
+        $items = [];
+        foreach ($poItems as $row) {
+            $qty = (int) $row->qty;
+            $price = (float) $row->price;
+            $lineTotal = $qty * $price;
+            $items[] = [
+                'item_ID' => $row->item_ID,
+                'description' => $row->item_Name,
+                'price' => $price,
+                'qty' => $qty,
+                'discount' => 0,
+                'line_total' => $lineTotal,
+            ];
+        }
+
+        // Replace current temp items with PO items
+        session([$this->sessionKey() => $items]);
+
+        return response()->json([
+            'success' => true,
+            'items' => $items,
+            'supplier_id' => $po->supp_Cus_ID,
+            'po_no' => $po->po_No,
+        ]);
+    }
+
     public function store(Request $request)
     {
         $request->validate([
@@ -157,6 +232,13 @@ class GRNController extends Controller
                 'updated_at' => now(),
             ]);
 
+            // Update supplier aggregates (Last_GRN, Total_Orders) atomically with GRN creation
+            $supplierForAggregates = \App\Models\Supplier::where('Supp_CustomID', $request->supp_Cus_ID)->first();
+            if ($supplierForAggregates) {
+                $supplierForAggregates->update(['Last_GRN' => $grnNo]);
+                $supplierForAggregates->increment('Total_Orders');
+            }
+
             foreach ($items as $item) {
                 GRNItem::create([
                     'grn_id' => $grnId,
@@ -170,7 +252,7 @@ class GRNController extends Controller
 
                 // Update stock quantity
                 Stock::increase($item['item_ID'], $item['qty']);
-                
+
                 // Calculate discounted unit cost and update stock cost if higher
                 $discountedUnitCost = $item['qty'] > 0 ? $item['line_total'] / $item['qty'] : $item['price'];
                 Stock::updateCostIfHigher($item['item_ID'], $discountedUnitCost);
@@ -179,16 +261,31 @@ class GRNController extends Controller
                 Products::updatePriceIfHigher($item['item_ID'], $item['price']);
             }
 
+            // If this GRN is linked to a PO, mark that PO as received
+            if (!empty($request->po_Auto_ID)) {
+                DB::table('po')
+                    ->where('po_Auto_ID', $request->po_Auto_ID)
+                    ->update([
+                        'orderStatus' => 'received',
+                        'updated_at' => now(),
+                    ]);
+            }
+
             session()->forget($this->sessionKey());
 
             DB::commit();
-            
+
+            // Recompute supplier aggregates in background
+            if ($supplierForAggregates) {
+                RecomputeSupplierTotals::dispatch($supplierForAggregates->Supp_CustomID);
+            }
+
             // Calculate total for payment prompt
             $totalAmount = collect($items)->sum('line_total');
-            
+
             // Get supplier information for payment prompt
             $supplier = \App\Models\Supplier::where('Supp_CustomID', $request->supp_Cus_ID)->first();
-            
+
             session()->flash('grn_created', [
                 'grn_id' => $grnId,
                 'grn_no' => $grnNo,
@@ -198,7 +295,7 @@ class GRNController extends Controller
                 'outstanding_amount' => $totalAmount, // For new GRN, outstanding equals total
                 'prompt_payment' => true
             ]);
-            
+
             return redirect()->route('grns.index')->with('success', 'GRN created successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
@@ -209,6 +306,11 @@ class GRNController extends Controller
     public function edit($id)
     {
         $grn = GRN::findOrFail($id);
+
+        // Prevent editing if fully paid
+        if ($grn->getOutstandingAmount() <= 0) {
+            return redirect()->route('grns.index')->with('error', 'Fully paid GRNs cannot be edited.');
+        }
 
         $items = GRNItem::where('grn_id', $id)->get();
 
@@ -246,6 +348,12 @@ class GRNController extends Controller
         try {
             $grn = GRN::findOrFail($id);
 
+            // Prevent update if fully paid
+            if ($grn->getOutstandingAmount() <= 0) {
+                DB::rollBack();
+                return redirect()->route('grns.index')->with('error', 'Fully paid GRNs cannot be edited.');
+            }
+
             // Rollback old stock
             $oldItems = GRNItem::where('grn_id', $id)->get();
             foreach ($oldItems as $item) {
@@ -275,11 +383,11 @@ class GRNController extends Controller
 
                 // Update stock quantity
                 Stock::increase($item['item_ID'], $item['qty']);
-                
+
                 // Calculate discounted unit cost and update stock cost if higher
                 $discountedUnitCost = $item['qty'] > 0 ? $item['line_total'] / $item['qty'] : $item['price'];
                 Stock::updateCostIfHigher($item['item_ID'], $discountedUnitCost);
-                
+
                 // Update item price if GRN price is higher
                 Products::updatePriceIfHigher($item['item_ID'], $item['price']);
             }
@@ -358,7 +466,7 @@ class GRNController extends Controller
         try {
             $grn = \App\Models\GRN::findOrFail($request->grn_id);
             $supplier = \App\Models\Supplier::where('Supp_CustomID', $grn->supp_Cus_ID)->first();
-            
+
             // Calculate GRN total and outstanding amount using the model methods
             $grnTotal = $grn->items->sum('line_total');
             $outstandingAmount = $grn->getOutstandingAmount();
@@ -400,6 +508,11 @@ class GRNController extends Controller
             }
 
             DB::commit();
+
+            // Keep supplier totals in sync (background)
+            if ($supplier) {
+                RecomputeSupplierTotals::dispatch($supplier->Supp_CustomID);
+            }
 
             // Refresh the GRN to get updated payment information
             $grn->refresh();
