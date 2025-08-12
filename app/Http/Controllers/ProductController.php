@@ -17,7 +17,7 @@ class ProductController extends Controller
     {
         $search = $request->input('search');
 
-        $query = Products::select('item_ID_Auto', 'item_ID', 'item_Name', 'product_Type', 'catagory_Name', 'sales_Price', 'units', 'unitofMeture', 'location')->where('status', 1);
+        $query = Products::select('item_ID_Auto', 'item_ID', 'item_Name', 'product_Type', 'catagory_Name', 'sales_Price', 'units', 'reorder_level', 'unitofMeture', 'location')->where('status', 1);
         ;
 
         if ($search) {
@@ -57,12 +57,13 @@ class ProductController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'item_ID'         => 'required|string|max:255|unique:products,item_ID',
+            'item_ID'         => 'required|string|max:255|unique:item,item_ID',
             'item_Name'       => 'required|string|max:255',
             'product_Type'    => 'required|in:Genuine,After Marcket',
             'catagory_Name'   => 'required|in:Spare,Oil,Electric,Modify',
             'sales_Price'     => 'nullable|numeric|min:0',
             'units'           => 'required|integer|min:0',
+            'reorder_level'   => 'nullable|integer|min:0',
             'unitofMeture'    => 'required|in:Item,ml,g,L,KG',
             'location'        => 'required|exists:Item_Location,location_Name',
 
@@ -105,6 +106,7 @@ class ProductController extends Controller
             'catagory_Name'   => 'required|in:Spare,Oil,Electric,Modify',
             'sales_Price'     => 'nullable|numeric|min:0',
             'units'           => 'required|integer|min:0',
+            'reorder_level'   => 'nullable|integer|min:0',
             'unitofMeture'    => 'required|in:Item,ml,gL,KG',
             'location'        => 'required|exists:Item_Location,location_Name',
 

@@ -419,7 +419,7 @@
             // Ensure only the two appointment types are shown (backend already filters, but double-guard)
             const filtered = this.notifications.filter(n => {
                 const t = n?.data?.type;
-                return t === 'appointment_created' || t === 'appointment_cancelled';
+                return t === 'appointment_created' || t === 'appointment_completed' || t === 'low_stock';
             });
             const itemsToShow = filtered.slice(0, 3);
             container.innerHTML = itemsToShow.map(notification => `
@@ -442,14 +442,10 @@
             switch(type) {
                 case 'appointment_created':
                     return 'bi bi-info-circle';
-                case 'appointment_confirmed':
-                    return 'bi bi-check-circle';
-                case 'appointment_rejected':
-                    return 'bi bi-x-circle';
-                case 'appointment_cancelled':
-                    return 'bi bi-dash-circle';
                 case 'appointment_completed':
                     return 'bi bi-check-square';
+                case 'low_stock':
+                    return 'bi bi-exclamation-triangle';
                 default:
                     return 'bi bi-info-circle';
             }
@@ -460,14 +456,10 @@
             switch(type) {
                 case 'appointment_created':
                     return 'text-success';
-                case 'appointment_confirmed':
-                    return 'text-success';
-                case 'appointment_rejected':
-                    return 'text-danger';
-                case 'appointment_cancelled':
-                    return 'text-warning';
                 case 'appointment_completed':
                     return 'text-info';
+                case 'low_stock':
+                    return 'text-danger';
                 default:
                     return 'text-success';
             }

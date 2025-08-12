@@ -24,6 +24,7 @@ class Products extends Model
         'catagory_Name',
         'sales_Price',
         'units',
+        'reorder_level',
         'unitofMeture',
         'location',
         'created_at',

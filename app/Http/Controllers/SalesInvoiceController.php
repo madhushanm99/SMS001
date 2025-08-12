@@ -629,11 +629,12 @@ class SalesInvoiceController extends Controller
             if (!$product || !$stock) {
                 return null;
             }
-            // Using Products.units as reorder level (as per StockController)
-            $reorderLevel = (int) ($product->units ?? 0);
+            // Use explicit reorder level from item table
+            $reorderLevel = (int) ($product->reorder_level ?? 0);
             $currentQty = (int) $stock->quantity;
             if ($reorderLevel > 0 && $currentQty <= $reorderLevel) {
                 $name = $itemName ?: ($product->item_Name ?? $itemId);
+                \App\Services\NotificationService::lowStockReached($itemId, $name, $currentQty, $reorderLevel);
                 return "Low stock: {$name} ({$itemId}) qty {$currentQty} ≤ reorder level {$reorderLevel}";
             }
         } catch (\Throwable $e) {

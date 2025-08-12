@@ -140,7 +140,14 @@ class NotificationService
             return 0;
         }
 
-        return $user->unreadNotifications()->count();
+        // Only count permitted notification types
+        return $user->unreadNotifications()
+            ->whereIn('data->type', [
+                'appointment_created',
+                'appointment_completed',
+                'low_stock',
+            ])
+            ->count();
     }
 
     /**
@@ -154,12 +161,34 @@ class NotificationService
             return collect();
         }
 
-        // Only keep New Appointment Request and Appointment Cancelled
+        // Only keep New Appointment Request, Appointment Completed, and Low Stock
         return $user->notifications()
-            ->whereIn('data->type', ['appointment_created', 'appointment_cancelled'])
+            ->whereIn('data->type', ['appointment_created', 'appointment_completed', 'low_stock'])
             ->latest()
             ->take($limit)
             ->get();
+    }
+
+    /**
+     * Send a low stock notification to all staff when reorder level is hit.
+     */
+    public static function lowStockReached(string $itemId, string $itemName, int $currentQty, int $reorderLevel): void
+    {
+        try {
+            $staffUsers = User::all();
+            $title = 'Low Stock Alert';
+            $message = "{$itemName} ({$itemId}) qty {$currentQty}  reorder level {$reorderLevel}";
+            Notification::send($staffUsers, new \App\Notifications\LowStockNotification(
+                $itemId,
+                $itemName,
+                $currentQty,
+                $reorderLevel,
+                $title,
+                $message
+            ));
+        } catch (\Throwable $e) {
+            // Silent fail for notification errors
+        }
     }
 
     /**

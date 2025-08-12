@@ -77,6 +77,12 @@
                 </div>
 
                 <div class="mb-3">
+                    <label for="reorder_level" class="form-label">Re-order Level</label>
+                    <input type="number" name="reorder_level" id="reorder_level" class="form-control"
+                        value="{{ old('reorder_level', $product->reorder_level) }}">
+                </div>
+
+                <div class="mb-3">
                     <label for="unitofMeture" class="form-label">Unit of Measure</label>
                     <select name="unitofMeture" id="unitofMeture" class="form-control" required>
                         <option value="">Select Unit</option>

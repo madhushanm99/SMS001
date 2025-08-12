@@ -11,7 +11,7 @@
     </thead>
     <tbody>
         @forelse ($items as $item)
-            <tr @if ($item->qty < 5) style="background-color: #fff3cd;" @endif>
+            <tr @if ($item->qty <= ($item->reorder_level ?? 0)) style="background-color: #fff3cd;" @endif>
                 <td>{{ $item->item_ID }}</td>
                 <td>{{ $item->item_Name }}</td>
                 <td>{{ $item->qty }}</td>
