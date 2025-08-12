@@ -90,7 +90,8 @@ class ServiceInvoiceController extends Controller
         $isFinalize = $request->has('finalize') && $request->finalize == '1';
         $invoice = null;
 
-        DB::transaction(function () use ($request, $jobItems, $spareItems, $isFinalize, &$invoice) {
+        $lowStockAlerts = [];
+        DB::transaction(function () use ($request, $jobItems, $spareItems, $isFinalize, &$invoice, &$lowStockAlerts) {
             $invoice = ServiceInvoice::create([
                 'invoice_no' => ServiceInvoice::generateInvoiceNo(),
                 'customer_id' => $request->customer_id,
@@ -120,6 +121,7 @@ class ServiceInvoiceController extends Controller
             }
 
             // Add spare items
+            $lowStockAlerts = $lowStockAlerts ?? [];
             foreach ($spareItems as $item) {
                 ServiceInvoiceItem::create([
                     'service_invoice_id' => $invoice->id,
@@ -141,6 +143,17 @@ class ServiceInvoiceController extends Controller
 
             // If immediately finalized, update customer's last_visit
             if ($isFinalize) {
+                // Reduce stock for spare items and check reorder levels
+                foreach ($spareItems as $item) {
+                    $qty = (int) ($item['qty'] ?? 0);
+                    if ($qty > 0) {
+                        Stock::reduce($item['item_id'], $qty);
+                        $alert = $this->buildReorderAlert($item['item_id'], $item['description'] ?? null);
+                        if ($alert) {
+                            $lowStockAlerts[] = $alert;
+                        }
+                    }
+                }
                 $customer = $invoice->customer; // relation uses custom_id mapping
                 if ($customer) {
                     $customer->updateLastVisit($invoice->invoice_date);
@@ -159,7 +172,8 @@ class ServiceInvoiceController extends Controller
         if ($isFinalize) {
             // Redirect to payment and PDF options page
             return redirect()->route('service_invoices.finalize_options', $invoice)
-                ->with('success', 'Service invoice finalized successfully!');
+                ->with('success', 'Service invoice finalized successfully!')
+                ->with('low_stock_alerts', $lowStockAlerts ?? []);
         }
 
         return redirect()->route('service_invoices.index')->with('success', 'Service invoice created successfully.');
@@ -296,6 +310,19 @@ class ServiceInvoiceController extends Controller
             return back()->with('error', 'Invoice cannot be finalized. It must be on hold and have at least one item.');
         }
 
+        // Reduce stock for spare items and check reorder levels
+        $lowStockAlerts = [];
+        $spareItems = $serviceInvoice->spareItems()->get();
+        foreach ($spareItems as $item) {
+            if ($item->qty > 0) {
+                Stock::reduce($item->item_id, $item->qty);
+                $alert = $this->buildReorderAlert($item->item_id, $item->item_name);
+                if ($alert) {
+                    $lowStockAlerts[] = $alert;
+                }
+            }
+        }
+
         $serviceInvoice->finalize();
 
         // Determine and set service type based on job items when finalizing
@@ -310,7 +337,11 @@ class ServiceInvoiceController extends Controller
         // Dispatch background calculation
         CalculateNextServiceSchedule::dispatch($serviceInvoice->id);
 
-        return back()->with('success', 'Invoice finalized successfully. You can now add payments.');
+        $redirect = back()->with('success', 'Invoice finalized successfully. You can now add payments.');
+        if (!empty($lowStockAlerts)) {
+            $redirect->with('low_stock_alerts', $lowStockAlerts);
+        }
+        return $redirect;
     }
 
     public function finalizeOptions(ServiceInvoice $serviceInvoice)

@@ -345,6 +345,8 @@ class SalesInvoiceController extends Controller
             // Load customer relationship for payment prompt
             $invoice->load('customer');
 
+            $lowStockAlerts = [];
+
             foreach ($items as $index => $item) {
                 SalesInvoiceItem::create([
                     'sales_invoice_id' => $invoice->id,
@@ -359,6 +361,12 @@ class SalesInvoiceController extends Controller
 
                 // Reduce stock for finalized invoice
                 Stock::reduce($item['item_id'], $item['qty']);
+
+                // Check reorder level after reduction
+                $alert = $this->buildReorderAlert($item['item_id'], $item['item_name']);
+                if ($alert) {
+                    $lowStockAlerts[] = $alert;
+                }
             }
 
             DB::commit();
@@ -378,7 +386,8 @@ class SalesInvoiceController extends Controller
                     'customer_name' => $invoice->customer->name ?? 'Unknown Customer',
                     'grand_total' => $invoice->grand_total,
                     'outstanding_amount' => $invoice->getOutstandingAmount()
-                ]
+                ],
+                'low_stock_alerts' => $lowStockAlerts,
             ]);
 
         } catch (\Exception $e) {
@@ -515,6 +524,7 @@ class SalesInvoiceController extends Controller
             ]);
 
             // Add new items
+            $lowStockAlerts = [];
             foreach ($items as $index => $item) {
                 SalesInvoiceItem::create([
                     'sales_invoice_id' => $invoice->id,
@@ -530,6 +540,10 @@ class SalesInvoiceController extends Controller
                 // If invoice is finalized, deduct stock for new items
                 if ($invoice->status === 'finalized') {
                     Stock::reduce($item['item_id'], $item['qty']);
+                    $alert = $this->buildReorderAlert($item['item_id'], $item['item_name']);
+                    if ($alert) {
+                        $lowStockAlerts[] = $alert;
+                    }
                 }
             }
 
@@ -543,7 +557,8 @@ class SalesInvoiceController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => $message,
-                'redirect_url' => route('sales_invoices.index')
+                'redirect_url' => route('sales_invoices.index'),
+                'low_stock_alerts' => $lowStockAlerts,
             ]);
 
         } catch (\Exception $e) {
@@ -575,8 +590,13 @@ class SalesInvoiceController extends Controller
             }
 
             // Reduce stock for all items
+            $lowStockAlerts = [];
             foreach ($invoice->items as $item) {
                 Stock::reduce($item->item_id, $item->qty);
+                $alert = $this->buildReorderAlert($item->item_id, $item->item_name);
+                if ($alert) {
+                    $lowStockAlerts[] = $alert;
+                }
             }
 
             // Update invoice status
@@ -584,14 +604,42 @@ class SalesInvoiceController extends Controller
 
             DB::commit();
 
-            return redirect()->route('sales_invoices.index')
+            $redirect = redirect()->route('sales_invoices.index')
                            ->with('success', 'Invoice finalized successfully');
+            if (!empty($lowStockAlerts)) {
+                $redirect->with('low_stock_alerts', $lowStockAlerts);
+            }
+            return $redirect;
 
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()
                            ->with('error', 'Error finalizing invoice: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Build a low stock alert message when stock falls to or below reorder level.
+     */
+    protected function buildReorderAlert(string $itemId, ?string $itemName = null): ?string
+    {
+        try {
+            $product = Products::where('item_ID', $itemId)->first();
+            $stock = Stock::where('item_ID', $itemId)->first();
+            if (!$product || !$stock) {
+                return null;
+            }
+            // Using Products.units as reorder level (as per StockController)
+            $reorderLevel = (int) ($product->units ?? 0);
+            $currentQty = (int) $stock->quantity;
+            if ($reorderLevel > 0 && $currentQty <= $reorderLevel) {
+                $name = $itemName ?: ($product->item_Name ?? $itemId);
+                return "Low stock: {$name} ({$itemId}) qty {$currentQty} ≤ reorder level {$reorderLevel}";
+            }
+        } catch (\Throwable $e) {
+            // Ignore alert errors
+        }
+        return null;
     }
 
     public function pdf($id)

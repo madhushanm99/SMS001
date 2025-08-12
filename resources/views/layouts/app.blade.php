@@ -96,6 +96,18 @@
         </script>
     @endif
 
+    @if (session('low_stock_alerts'))
+        <script>
+            Swal.fire({
+                icon: 'warning',
+                title: 'Reorder Level Reached',
+                html: '<div class="text-start">' + @json(session('low_stock_alerts')).map(function(msg){return `<div class="text-danger">• ${msg}</div>`}).join('') + '</div>',
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#dc3545'
+            });
+        </script>
+    @endif
+
     <!-- Real-time Notifications with Laravel Echo + Reverb -->
     <script>
 
@@ -404,7 +416,12 @@
                 return;
             }
 
-            const itemsToShow = this.notifications.slice(0, 3);
+            // Ensure only the two appointment types are shown (backend already filters, but double-guard)
+            const filtered = this.notifications.filter(n => {
+                const t = n?.data?.type;
+                return t === 'appointment_created' || t === 'appointment_cancelled';
+            });
+            const itemsToShow = filtered.slice(0, 3);
             container.innerHTML = itemsToShow.map(notification => `
                 <li class="notification-item ${!notification.read_at ? 'unread' : ''}">
                     <a href="${notification.data?.url || '#'}" onclick="notificationManager.markAsRead('${notification.id}')">

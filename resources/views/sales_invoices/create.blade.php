@@ -30,7 +30,7 @@
                                 </div>
                                 <div class="col-md-6">
                                     <label for="notes" class="form-label">Notes</label>
-                                    <textarea class="form-control" id="notes" name="notes" rows="2" 
+                                    <textarea class="form-control" id="notes" name="notes" rows="2"
                                               placeholder="Optional notes..."></textarea>
                                 </div>
                             </div>
@@ -95,7 +95,7 @@
                                             </tbody>
                                         </table>
                                     </div>
-                                    
+
                                     <div class="row mt-3">
                                         <div class="col-md-6"></div>
                                         <div class="col-md-6">
@@ -132,9 +132,9 @@
     </section>
 
     <!-- Include Payment Prompt Modal -->
-    <x-payment-prompt 
-    type="invoice" 
-    payment_type="cash_in" 
+    <x-payment-prompt
+    type="invoice"
+    payment_type="cash_in"
     title="Record Customer Payment"
     :payment_methods="$paymentMethods"
     :bank_accounts="$bankAccounts"
@@ -226,7 +226,7 @@
                         if (response.success) {
                             updateItemsTable(response.items);
                             updateGrandTotal(response.total);
-                            
+
                             // Reset form
                             $('#item_search').val(null).trigger('change');
                             $('#qty').val(1);
@@ -273,7 +273,7 @@
                         <td>${item.discount}%</td>
                         <td>Rs. ${parseFloat(item.line_total).toFixed(2)}</td>
                         <td>
-                            <button type="button" class="btn btn-sm btn-outline-danger" 
+                            <button type="button" class="btn btn-sm btn-outline-danger"
                                     onclick="removeItem('${item.item_id}')">
                                 <i class="bi bi-trash"></i>
                             </button>
@@ -334,6 +334,17 @@
                 },
                 success: function(response) {
                     if (response.success) {
+                        // If any low stock alerts, show a red warning first
+                        if (response.low_stock_alerts && response.low_stock_alerts.length > 0) {
+                            Swal.fire({
+                                icon: 'warning',
+                                title: 'Reorder Level Reached',
+                                html: '<div class="text-start">' + response.low_stock_alerts.map(msg => `<div class="text-danger">• ${msg}</div>`).join('') + '</div>',
+                                confirmButtonText: 'OK',
+                                confirmButtonColor: '#dc3545'
+                            });
+                        }
+
                         if (action === 'finalize' && response.prompt_payment) {
                             // Show payment prompt modal
                             if (typeof window.showPaymentPrompt === 'function') {

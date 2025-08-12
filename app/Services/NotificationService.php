@@ -154,7 +154,9 @@ class NotificationService
             return collect();
         }
 
+        // Only keep New Appointment Request and Appointment Cancelled
         return $user->notifications()
+            ->whereIn('data->type', ['appointment_created', 'appointment_cancelled'])
             ->latest()
             ->take($limit)
             ->get();
