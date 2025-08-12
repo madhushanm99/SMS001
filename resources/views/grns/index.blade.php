@@ -268,7 +268,8 @@
                             entity_no: grnData.grn_no,
                             party_name: grnData.supplier_name,
                             total_amount: grnData.total_amount,
-                            outstanding_amount: grnData.total_amount
+                            outstanding_amount: grnData.outstanding_amount,
+                            available_credit: grnData.available_credit || 0
                         });
                     }
                 });

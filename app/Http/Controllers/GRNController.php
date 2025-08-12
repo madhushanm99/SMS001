@@ -280,11 +280,15 @@ class GRNController extends Controller
                 RecomputeSupplierTotals::dispatch($supplierForAggregates->Supp_CustomID);
             }
 
-            // Calculate total for payment prompt
+            // Calculate totals for payment prompt
             $totalAmount = collect($items)->sum('line_total');
 
-            // Get supplier information for payment prompt
+            // Get supplier information and any available credit from unpaid purchase returns
             $supplier = \App\Models\Supplier::where('Supp_CustomID', $request->supp_Cus_ID)->first();
+            $availableCredit = $supplier ? $supplier->getOutstandingPurchaseReturnCredit() : 0.0;
+
+            // Net outstanding after applying available credit (but do not go below zero)
+            $netOutstanding = max(0, $totalAmount - $availableCredit);
 
             session()->flash('grn_created', [
                 'grn_id' => $grnId,
@@ -292,7 +296,8 @@ class GRNController extends Controller
                 'supplier_id' => $request->supp_Cus_ID,
                 'supplier_name' => $supplier->Supp_Name ?? 'Unknown Supplier',
                 'total_amount' => $totalAmount,
-                'outstanding_amount' => $totalAmount, // For new GRN, outstanding equals total
+                'available_credit' => $availableCredit,
+                'outstanding_amount' => $netOutstanding,
                 'prompt_payment' => true
             ]);
 

@@ -70,6 +70,10 @@
                                     <input type="text" class="form-control" value="{{ $supplier->Total_Orders }}"
                                         disabled>
                                 </div>
+                                <div class="form-group mb-3">
+                                    <label>Outstanding Purchase Return Credit</label>
+                                    <input type="text" class="form-control" value="{{ number_format($supplier->getOutstandingPurchaseReturnCredit(), 2) }}" disabled>
+                                </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="form-group mb-3">
