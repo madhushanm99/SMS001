@@ -26,7 +26,7 @@
                         <form method="POST" action="{{ route('service_invoices.update', $serviceInvoice) }}" id="editServiceInvoiceForm">
                             @csrf
                             @method('PUT')
-                            
+
                             <!-- Tab Navigation -->
                             <ul class="nav nav-tabs" id="editServiceInvoiceTabs" role="tablist">
                                 <li class="nav-item" role="presentation">
@@ -72,7 +72,7 @@
                                         <div class="col-md-6">
                                             <div class="mb-3">
                                                 <label for="edit_mileage" class="form-label">Mileage (km)</label>
-                                                <input type="number" class="form-control" id="edit_mileage" name="mileage" 
+                                                <input type="number" class="form-control" id="edit_mileage" name="mileage"
                                                        value="{{ old('mileage', $serviceInvoice->mileage) }}" min="0">
                                                 @error('mileage')
                                                     <div class="text-danger">{{ $message }}</div>
@@ -154,6 +154,7 @@
                                                 </div>
                                                 <div class="col-md-2">
                                                     <input type="number" class="form-control" id="edit_item_qty" placeholder="Qty" min="1" value="1">
+                                                    <div class="form-text" id="edit_item_stock"></div>
                                                 </div>
                                                 <div class="col-md-3">
                                                     <input type="number" class="form-control" id="edit_item_price" placeholder="Price" step="0.01" min="0">
@@ -194,7 +195,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    
+
                                     <!-- Invoice Summary -->
                                     <div class="row mt-4">
                                         <div class="col-md-6 offset-md-6">
@@ -292,6 +293,9 @@
                 select: function(event, ui) {
                     $('#edit_selected_item_id').val(ui.item.id);
                     $('#edit_item_price').val(ui.item.price);
+                    const stockQty = ui.item.stock_qty || 0;
+                    $('#edit_item_qty').attr('max', stockQty);
+                    $('#edit_item_stock').text(stockQty > 0 ? `Available: ${stockQty}` : 'Out of stock');
                     return false;
                 }
             }).autocomplete("instance")._renderItem = function(ul, item) {
@@ -343,6 +347,16 @@
                 return;
             }
 
+            const available = parseInt($('#edit_item_qty').attr('max') || '0');
+            if (available <= 0) {
+                alert('This item is out of stock and cannot be added.');
+                return;
+            }
+            if (parseInt(qty) > available) {
+                alert(`Insufficient stock. Available: ${available}`);
+                return;
+            }
+
             $.post('{{ route("service_invoices.add_spare_item") }}', {
                 _token: '{{ csrf_token() }}',
                 item_id: itemId,
@@ -355,6 +369,8 @@
                     loadSpareItems();
                     clearItemForm();
                     updateTotals();
+                } else {
+                    alert(response.message || 'Failed to add item');
                 }
             });
         });
@@ -374,7 +390,7 @@
                     console.log('Job items response:', response);
                     const tbody = $('#edit_job_items_table tbody');
                     tbody.empty();
-                    
+
                     if (response.items && response.items.length > 0) {
                         response.items.forEach(function(item, index) {
                             tbody.append(`
@@ -419,7 +435,7 @@
                     console.log('Spare items response:', response);
                     const tbody = $('#edit_spare_items_table tbody');
                     tbody.empty();
-                    
+
                     if (response.items && response.items.length > 0) {
                         response.items.forEach(function(item, index) {
                             tbody.append(`
@@ -508,38 +524,39 @@
             $('#edit_selected_item_id').val('');
             $('#edit_item_qty').val('1');
             $('#edit_item_price').val('');
+            $('#edit_item_stock').text('');
         }
 
         // Debug: Check session data directly
         console.log('Session data check:');
         console.log('Job items in session:', @json(session('edit_service_invoice_job_items', [])));
         console.log('Spare items in session:', @json(session('edit_service_invoice_spare_items', [])));
-        
+
         // Load initial data
         loadJobItems();
         loadSpareItems();
         updateTotals();
-        
+
         // Fallback: If AJAX fails, load from session data directly
         setTimeout(function() {
             const jobItems = @json(session('edit_service_invoice_job_items', []));
             const spareItems = @json(session('edit_service_invoice_spare_items', []));
-            
+
             if (jobItems.length > 0) {
                 console.log('Loading job items from session fallback:', jobItems);
                 renderJobItemsFromSession(jobItems);
             }
-            
+
             if (spareItems.length > 0) {
                 console.log('Loading spare items from session fallback:', spareItems);
                 renderSpareItemsFromSession(spareItems);
             }
         }, 2000);
-        
+
         function renderJobItemsFromSession(items) {
             const tbody = $('#edit_job_items_table tbody');
             tbody.empty();
-            
+
             items.forEach(function(item, index) {
                 tbody.append(`
                     <tr>
@@ -556,11 +573,11 @@
                 `);
             });
         }
-        
+
         function renderSpareItemsFromSession(items) {
             const tbody = $('#edit_spare_items_table tbody');
             tbody.empty();
-            
+
             items.forEach(function(item, index) {
                 tbody.append(`
                     <tr>
@@ -585,4 +602,4 @@
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/ui-lightness/jquery-ui.css">
     @endpush
-</x-layout> 
+</x-layout>

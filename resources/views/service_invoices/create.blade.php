@@ -129,6 +129,7 @@
                             <div class="col-md-2">
                                 <label for="spare_qty" class="form-label">Quantity</label>
                                 <input type="number" id="spare_qty" class="form-control" min="1" value="1">
+                                <div class="form-text" id="spare_stock" ></div>
                             </div>
                             <div class="col-md-2">
                                 <label for="spare_price" class="form-label">Price</label>
@@ -320,6 +321,9 @@
                 }
             }).on('select2:select', function(e) {
                 $('#spare_price').val(e.params.data.price);
+                const stockQty = e.params.data.stock_qty ?? 0;
+                $('#spare_qty').attr('max', stockQty);
+                $('#spare_stock').text(stockQty > 0 ? `Available: ${stockQty}` : 'Out of stock');
             });
         }
 
@@ -366,6 +370,16 @@
                 return;
             }
 
+            const available = parseInt(selectedSpare.stock_qty || 0);
+            if (available <= 0) {
+                alert('This item is out of stock and cannot be added.');
+                return;
+            }
+            if (qty > available) {
+                alert(`Insufficient stock. Available: ${available}`);
+                return;
+            }
+
             fetch('{{ route('service_invoices.add_spare_item') }}', {
                 method: 'POST',
                 headers: {
@@ -384,7 +398,10 @@
                     $('#spare_selector').val(null).trigger('change');
                     $('#spare_qty').val(1);
                     $('#spare_price').val('');
+                    $('#spare_stock').text('');
                     updateTotals();
+                } else {
+                    alert(data.message || 'Failed to add item');
                 }
             });
         });

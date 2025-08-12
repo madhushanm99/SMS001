@@ -9,6 +9,7 @@ use App\Models\Customer;
 use App\Models\Vehicle;
 use App\Models\JobTypes;
 use App\Models\Products;
+use App\Models\Stock;
 use App\Models\PaymentTransaction;
 use App\Models\PaymentMethod;
 use App\Models\PaymentCategory;
@@ -548,10 +549,14 @@ class ServiceInvoiceController extends Controller
             ->limit(10)
             ->get()
             ->map(function ($item) {
+                // Include current stock quantity for client-side validation
+                $stock = Stock::where('item_ID', $item->item_ID)->first();
+                $stockQty = $stock ? (int) $stock->quantity : 0;
                 return [
                     'id' => $item->item_ID,
                     'text' => $item->item_Name,
                     'price' => $item->sales_Price,
+                    'stock_qty' => $stockQty,
                 ];
             });
 
@@ -625,16 +630,42 @@ class ServiceInvoiceController extends Controller
             'price' => 'required|numeric|min:0'
         ]);
 
+        // Server-side stock validation: prevent adding items when available stock is 0
+        $stock = Stock::where('item_ID', $request->item_id)->first();
+        $availableQty = $stock ? (int) $stock->quantity : 0;
+        if ($availableQty <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This item has no stock available',
+            ], 200);
+        }
+
+        // Also ensure cumulative quantity in the session does not exceed stock
+        $sessionKey = $request->has('edit_mode') ? 'edit_service_invoice_spare_items' : 'service_invoice_spare_items';
+        $items = session()->get($sessionKey, []);
+
+        $existingQtyForItem = 0;
+        foreach ($items as $existing) {
+            if (($existing['item_id'] ?? null) === $request->item_id) {
+                $existingQtyForItem += (int) ($existing['qty'] ?? 0);
+            }
+        }
+
+        if ($existingQtyForItem + (int) $request->qty > $availableQty) {
+            return response()->json([
+                'success' => false,
+                'message' => "Insufficient stock. Available: {$availableQty} (already added: {$existingQtyForItem})",
+            ], 200);
+        }
+
         $item = [
             'item_id' => $request->item_id,
             'description' => $request->description,
-            'qty' => $request->qty,
-            'price' => $request->price,
-            'line_total' => $request->qty * $request->price
+            'qty' => (int) $request->qty,
+            'price' => (float) $request->price,
+            'line_total' => (float) $request->qty * (float) $request->price
         ];
 
-        $sessionKey = $request->has('edit_mode') ? 'edit_service_invoice_spare_items' : 'service_invoice_spare_items';
-        $items = session()->get($sessionKey, []);
         $items[] = $item;
         session([$sessionKey => $items]);
 
