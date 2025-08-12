@@ -91,7 +91,7 @@ class ServiceScheduleController extends Controller
         ]);
 
         /** @var LengthAwarePaginator $schedules */
-        $schedules = $query->paginate(15)->withQueryString();
+        $schedules = $query->paginate(10)->withQueryString();
 
         return view('service_schedules.index', compact('schedules'));
     }

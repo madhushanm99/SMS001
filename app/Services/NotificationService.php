@@ -34,28 +34,7 @@ class NotificationService
         event(new AppointmentStatusChanged($appointment, null, 'pending', $appointment->customer->name));
     }
 
-    /**
-     * Send notification when appointment is confirmed
-     */
-    public static function appointmentConfirmed(Appointment $appointment, string $handledBy): void
-    {
-        $title = 'Appointment Confirmed';
-        $message = "Appointment {$appointment->appointment_no} has been confirmed by {$handledBy}";
-
-        // Get all staff users
-        $staffUsers = User::all();
-
-        // Send notification to all staff
-        Notification::send($staffUsers, new AppointmentNotification(
-            $appointment,
-            'appointment_confirmed',
-            $title,
-            $message
-        ));
-
-        // Broadcast the event
-        event(new AppointmentStatusChanged($appointment, 'pending', 'confirmed', $handledBy));
-    }
+    // Removed appointmentConfirmed notifications per requirements.
 
     /**
      * Send notification when appointment is rejected
@@ -106,28 +85,7 @@ class NotificationService
         event(new AppointmentStatusChanged($appointment, 'confirmed', 'cancelled', $appointment->customer->name));
     }
 
-    /**
-     * Send notification when appointment is completed
-     */
-    public static function appointmentCompleted(Appointment $appointment, string $handledBy): void
-    {
-        $title = 'Appointment Completed';
-        $message = "Appointment {$appointment->appointment_no} has been completed by {$handledBy}";
-
-        // Get all staff users
-        $staffUsers = User::all();
-
-        // Send notification to all staff
-        Notification::send($staffUsers, new AppointmentNotification(
-            $appointment,
-            'appointment_completed',
-            $title,
-            $message
-        ));
-
-        // Broadcast the event
-        event(new AppointmentStatusChanged($appointment, 'confirmed', 'completed', $handledBy));
-    }
+    // Removed appointmentCompleted notifications per requirements.
 
     /**
      * Get unread notification count for current user

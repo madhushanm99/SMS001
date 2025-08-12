@@ -25,9 +25,9 @@
                 <div class="col-md-4">
                     <select class="form-select" name="type">
                         <option value="">All Types</option>
-                        <option value="appointment_created" {{ request('type') == 'appointment_created' ? 'selected' : '' }}>New Appointments</option>
-                        <option value="appointment_cancelled" {{ request('type') == 'appointment_cancelled' ? 'selected' : '' }}>Cancelled Appointments</option>
-                        <option value="service_completed" {{ request('type') == 'service_completed' ? 'selected' : '' }}>Completed Services</option>
+                        <option value="appointment_created" {{ request('type') == 'appointment_created' ? 'selected' : '' }}>New Appointment Request</option>
+                        <option value="appointment_cancelled" {{ request('type') == 'appointment_cancelled' ? 'selected' : '' }}>Appointment Cancelled</option>
+                        <option value="low_stock" {{ request('type') == 'low_stock' ? 'selected' : '' }}>Low Stock Alert</option>
                     </select>
                 </div>
                 <div class="col-md-4">
@@ -56,10 +56,8 @@
                     $isUnread = is_null($notification->read_at);
                     $icon = match($type) {
                         'appointment_created' => 'bi bi-info-circle',
-                        'appointment_confirmed' => 'bi bi-check-circle',
-                        'appointment_rejected' => 'bi bi-x-circle',
                         'appointment_cancelled' => 'bi bi-dash-circle',
-                        'appointment_completed' => 'bi bi-check-square',
+                        'low_stock' => 'bi bi-exclamation-triangle',
                         default => 'bi bi-info-circle',
                     };
                     $link = $data['url'] ?? (isset($data['appointment_id']) ? route('appointments.show', $data['appointment_id']) : '#');
@@ -84,9 +82,9 @@
                             </div>
                         </div>
                         <div class="mt-2">
-                            @if($link && $link !== '#')
-                                <a href="{{ $link }}" class="btn btn-sm btn-outline-primary">View Appointment</a>
-                            @endif
+                                @if($link && $link !== '#')
+                                    <a href="{{ $link }}" class="btn btn-sm btn-outline-primary">Open</a>
+                                @endif
                         </div>
                     </div>
                     <div class="ml-2">

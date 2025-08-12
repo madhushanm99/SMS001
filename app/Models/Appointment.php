@@ -24,7 +24,8 @@ class Appointment extends Model
 
     protected $casts = [
         'appointment_date' => 'date',
-        'appointment_time' => 'datetime:H:i',
+        // Keep time as-is; we'll format safely in accessors to avoid double-date strings
+        'appointment_time' => 'datetime',
         'handled_at' => 'datetime',
     ];
 
@@ -94,7 +95,7 @@ class Appointment extends Model
     // Appointment date and time methods
     public function getFormattedDateTime(): string
     {
-        return $this->appointment_date->format('d M Y') . ' at ' . Carbon::parse($this->appointment_time)->format('h:i A');
+        return $this->appointment_date->format('d M Y') . ' at ' . $this->getFormattedTime();
     }
 
     public function getFormattedDate(): string
@@ -104,7 +105,10 @@ class Appointment extends Model
 
     public function getFormattedTime(): string
     {
-        return Carbon::parse($this->appointment_time)->format('h:i A');
+        $time = $this->appointment_time instanceof Carbon
+            ? $this->appointment_time
+            : Carbon::parse($this->appointment_time);
+        return $time->format('h:i A');
     }
 
     /**
@@ -112,8 +116,8 @@ class Appointment extends Model
      */
     public function isUpcoming(): bool
     {
-        $appointmentDateTime = Carbon::parse($this->appointment_date . ' ' . $this->appointment_time);
-        return $appointmentDateTime->isFuture();
+        $dt = $this->getAppointmentDateTime();
+        return $dt->isFuture();
     }
 
     /**
@@ -121,13 +125,27 @@ class Appointment extends Model
      */
     public function getTimeUntil(): string
     {
-        $appointmentDateTime = Carbon::parse($this->appointment_date . ' ' . $this->appointment_time);
+        $dt = $this->getAppointmentDateTime();
 
-        if ($appointmentDateTime->isPast()) {
+        if ($dt->isPast()) {
             return 'Appointment has passed';
         }
 
-        return $appointmentDateTime->diffForHumans();
+        return $dt->diffForHumans();
+    }
+
+    private function getAppointmentDateTime(): Carbon
+    {
+        $dateStr = $this->appointment_date instanceof Carbon
+            ? $this->appointment_date->format('Y-m-d')
+            : Carbon::parse($this->appointment_date)->format('Y-m-d');
+
+        $time = $this->appointment_time instanceof Carbon
+            ? $this->appointment_time
+            : Carbon::parse($this->appointment_time);
+        $timeStr = $time->format('H:i:s');
+
+        return Carbon::createFromFormat('Y-m-d H:i:s', $dateStr . ' ' . $timeStr);
     }
 
     // Check if appointment can be cancelled

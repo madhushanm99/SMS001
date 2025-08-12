@@ -153,11 +153,11 @@
                                  data-date="{{ $day['date'] }}">
                                 <div class="day-number">{{ $day['day'] }}</div>
 
-                                @if(count($day['appointments']) > 3)
-                                    <div class="appointment-count">{{ count($day['appointments']) }}</div>
+                                @if(($day['appointments'] instanceof \Illuminate\Support\Collection ? $day['appointments']->count() : count($day['appointments'])) > 3)
+                                    <div class="appointment-count">{{ $day['appointments'] instanceof \Illuminate\Support\Collection ? $day['appointments']->count() : count($day['appointments']) }}</div>
                                 @endif
 
-                                @foreach(array_slice($day['appointments'], 0, 3) as $appointment)
+                                @foreach(($day['appointments'] instanceof \Illuminate\Support\Collection ? $day['appointments']->take(3) : collect($day['appointments'])->take(3)) as $appointment)
                                 <div class="appointment-item {{ $appointment->status }}"
                                      onclick="showAppointment('{{ $appointment->id }}')"
                                      title="{{ $appointment->getFormattedTime() }} - {{ $appointment->customer->name ?? 'N/A' }}">
@@ -165,9 +165,9 @@
                                 </div>
                                 @endforeach
 
-                                @if(count($day['appointments']) > 3)
+                                @if(($day['appointments'] instanceof \Illuminate\Support\Collection ? $day['appointments']->count() : count($day['appointments'])) > 3)
                                 <div class="appointment-item" style="background: #6c757d;">
-                                    +{{ count($day['appointments']) - 3 }} more
+                                    +{{ ($day['appointments'] instanceof \Illuminate\Support\Collection ? $day['appointments']->count() : count($day['appointments'])) - 3 }} more
                                 </div>
                                 @endif
                             </div>

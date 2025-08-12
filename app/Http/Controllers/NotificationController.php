@@ -96,7 +96,7 @@ class NotificationController extends Controller
             $query->where('type', 'like', "%{$request->type}%");
         }
 
-        $notifications = $query->latest()->paginate(20)->withQueryString();
+        $notifications = $query->latest()->paginate(10)->withQueryString();
 
         return view('notifications.index', compact('notifications'));
     }

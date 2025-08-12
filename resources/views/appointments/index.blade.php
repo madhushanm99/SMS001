@@ -153,7 +153,7 @@
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h5 class="card-title mb-0">Appointments List</h5>
-                            <a href="{{ route('appointments.calendar') }}" class="btn btn-outline-primary btn-sm">
+                            <a href="#" class="btn btn-outline-primary btn-sm">
                                 <i class="bi bi-calendar-week"></i> Calendar View
                             </a>
                         </div>

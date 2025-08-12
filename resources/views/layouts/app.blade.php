@@ -422,9 +422,11 @@
                 return t === 'appointment_created' || t === 'appointment_completed' || t === 'low_stock';
             });
             const itemsToShow = filtered.slice(0, 3);
-            container.innerHTML = itemsToShow.map(notification => `
+            container.innerHTML = itemsToShow.map(notification => {
+                const url = notification.data?.url || '#';
+                return `
                 <li class="notification-item ${!notification.read_at ? 'unread' : ''}">
-                    <a href="${notification.data?.url || '#'}" onclick="notificationManager.markAsRead('${notification.id}')">
+                    <a href="${url}" onclick="event.preventDefault(); notificationManager.openAndMark('${notification.id}', '${url}')">
                         <i class="${this.getNotificationIcon(notification)} ${this.getNotificationColor(notification)}"></i>
                         <div>
                             <h4>${notification.data?.title || 'Notification'}</h4>
@@ -434,7 +436,8 @@
                     </a>
                 </li>
                 <li><hr class="dropdown-divider"></li>
-            `).join('');
+                `;
+            }).join('');
         }
 
         getNotificationIcon(notification) {
@@ -498,6 +501,16 @@
                 this.loadNotifications();
             } catch (error) {
                 console.error('Error marking notification as read:', error);
+            }
+        }
+
+        async openAndMark(notificationId, url) {
+            try {
+                await this.markAsRead(notificationId);
+            } finally {
+                if (url && url !== '#') {
+                    window.location.href = url;
+                }
             }
         }
 

@@ -52,7 +52,7 @@ class StaffAppointmentController extends Controller
             });
         }
 
-        $appointments = $query->latest('appointment_date')->latest('appointment_time')->paginate(15)->withQueryString();
+        $appointments = $query->latest('appointment_date')->latest('appointment_time')->paginate(10)->withQueryString();
 
         // Calculate summary statistics
         $totalAppointments = Appointment::count();
@@ -106,8 +106,7 @@ class StaffAppointmentController extends Controller
             'handled_at' => now(),
         ]);
 
-        // Send real-time notification about confirmation
-        NotificationService::appointmentConfirmed($appointment, Auth::user()->name ?? Auth::user()->email);
+        // Confirmation notifications disabled per requirements
 
         // Send confirmation email to customer (queued)
         $this->sendAppointmentEmail($appointment, 'confirmed');
@@ -193,8 +192,7 @@ class StaffAppointmentController extends Controller
             $appointment->customer->updateLastVisit($appointment->appointment_date);
         }
 
-        // Send real-time notification about completion
-        NotificationService::appointmentCompleted($appointment, Auth::user()->name ?? Auth::user()->email);
+        // Completion notifications disabled per requirements
 
         if ($request->expectsJson()) {
             return response()->json([
