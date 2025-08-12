@@ -12,7 +12,7 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // Every Sunday at 7:00 PM
+        
         $schedule->command('service-reminders:send')->mondays()->at('19:00');
     }
 
